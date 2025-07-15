@@ -1,0 +1,30 @@
+{
+  "development": {
+    "projectId": "fylgja-app",
+    "databaseURL": "https://fylgja-app-default-rtdb.firebaseio.com/",
+    "storageBucket": "fylgja-app.appspot.com",
+    "messagingSenderId": "118321029912778509651",
+    "appId": "1:118321029912778509651:web:dev",
+    "apiKey": "AIzaSyDevelopmentKeyPlaceholder",
+    "authDomain": "fylgja-app.firebaseapp.com"
+  },
+  "staging": {
+    "projectId": "fylgja-app-staging",
+    "databaseURL": "https://fylgja-app-staging-default-rtdb.firebaseio.com/",
+    "storageBucket": "fylgja-app-staging.appspot.com",
+    "messagingSenderId": "118321029912778509651",
+    "appId": "1:118321029912778509651:web:staging",
+    "apiKey": "AIzaSyStagingKeyPlaceholder",
+    "authDomain": "fylgja-app-staging.firebaseapp.com"
+  },
+  "production": {
+    "projectId": "fylgja-app",
+    "databaseURL": "https://fylgja-app-default-rtdb.firebaseio.com/",
+    "storageBucket": "fylgja-app.appspot.com",
+    "messagingSenderId": "118321029912778509651",
+    "appId": "1:118321029912778509651:web:prod",
+    "apiKey": "AIzaSyProductionKeyPlaceholder",
+    "authDomain": "fylgja-app.firebaseapp.com"
+  }
+}
+

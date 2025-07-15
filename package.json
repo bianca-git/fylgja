@@ -1,0 +1,53 @@
+{
+  "name": "fylgja",
+  "version": "1.0.0",
+  "description": "Fylgja - AI Check-in Bot with Adaptive Learning and Legacy Preservation",
+  "main": "index.js",
+  "scripts": {
+    "dev": "firebase emulators:start --import=./emulator-data --export-on-exit=./emulator-data",
+    "build": "npm run build:functions && npm run build:web",
+    "build:functions": "cd functions && npm run build",
+    "build:web": "cd web && npm run build",
+    "deploy": "firebase deploy",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:firestore": "firebase deploy --only firestore",
+    "test": "npm run test:functions && npm run test:web",
+    "test:functions": "cd functions && npm test",
+    "test:web": "cd web && npm test",
+    "lint": "npm run lint:functions && npm run lint:web",
+    "lint:functions": "cd functions && npm run lint",
+    "lint:web": "cd web && npm run lint",
+    "setup": "./scripts/setup.sh",
+    "backup": "./scripts/backup.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bianca-git/fylgja.git"
+  },
+  "keywords": [
+    "ai",
+    "chatbot",
+    "companion",
+    "firebase",
+    "whatsapp",
+    "google-home",
+    "adaptive-learning",
+    "legacy-preservation"
+  ],
+  "author": "Bianca",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bianca-git/fylgja/issues"
+  },
+  "homepage": "https://github.com/bianca-git/fylgja#readme",
+  "devDependencies": {
+    "firebase-tools": "^13.0.0",
+    "concurrently": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
+
