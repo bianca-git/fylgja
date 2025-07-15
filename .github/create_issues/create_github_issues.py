@@ -88,57 +88,131 @@ class GitHubIssueCreator:
 
     def create_issue_body(self, task: Task) -> str:
         """Create formatted issue body from task data"""
-        body = f"""## Task Details
 
-**Task ID:** {task.task_id}  
-**Phase:** {task.phase}  
-**Week:** {task.week}  
-**Duration:** {task.duration} days  
-**Assignee:** {task.assignee}  
-**Priority:** {task.priority}  
-**Status:** {task.status}  
+        # Parse deliverables into checklist format
+        deliverables_list = []
+        if task.deliverables:
+            for deliverable in task.deliverables.split(", "):
+                deliverables_list.append(f"- [ ] {deliverable.strip()}")
+
+        # Parse acceptance criteria into checklist format
+        acceptance_criteria_list = []
+        if task.acceptance_criteria:
+            for criteria in task.acceptance_criteria.split(", "):
+                acceptance_criteria_list.append(f"- [ ] {criteria.strip()}")
+
+        # Determine automation-specific sections
+        automation_section = ""
+        definition_of_done = ""
+
+        if task.automation_category.upper() == "HUMAN":
+            automation_section = """
+## Description
+Brief description of what needs to be done by a human team member.
+
+**HUMAN Only:** This task requires human intervention for strategic decisions, user research, or quality validation.
+
+## Human Actions Required
+- [ ] Account setup/management
+- [ ] Strategic decisions
+- [ ] User research
+- [ ] Quality validation
+- [ ] Legal/compliance review
+- [ ] Other: ___________"""
+
+            definition_of_done = """
+## Definition of Done
+- [ ] Documentation updated
+- [ ] All required actions completed
+- [ ] Next steps identified
+- [ ] Stakeholders notified"""
+
+        elif task.automation_category.upper() == "MANUS":
+            automation_section = """
+## Description
+Brief description of what needs to be implemented using AI automation.
+
+**MANUS Only:** This task can be fully automated using AI tools and does not require human intervention.
+
+## Manus Implementation Required
+- [ ] Code generation
+- [ ] Configuration files
+- [ ] Documentation
+- [ ] Testing framework
+- [ ] Other: ___________"""
+
+            definition_of_done = """
+## Definition of Done
+- [ ] Code implemented and tested
+- [ ] Tests passing
+- [ ] Ready for human review"""
+
+        elif task.automation_category.upper() == "SPLIT":
+            automation_section = """
+## Description
+Brief description of what needs to be done through combined human and AI efforts.
+
+**SPLIT Only:** This task is split between human and AI efforts.
+
+## Split Implementation Required
+- [ ] Manus automation
+- [ ] Human oversight
+- [ ] Integration validation
+- [ ] Other: ___________"""
+
+            definition_of_done = """
+## Definition of Done
+- [ ] Manus automation completed
+- [ ] Human oversight completed
+- [ ] Integration validated
+- [ ] Ready for next phase"""
+
+        body = f"""## Task Overview
+**Task ID:** {task.task_id}
+**Phase:** {task.phase}
+**Week:** {task.week}
+**Duration:** {task.duration} days
+**Priority:** {task.priority}
+{automation_section}
+
+## Deliverables
+{chr(10).join(deliverables_list) if deliverables_list else "- [ ] To be defined"}
+
+## Acceptance Criteria
+{chr(10).join(acceptance_criteria_list) if acceptance_criteria_list else "- [ ] To be defined"}
+
+## Dependencies
+List any tasks that must be completed before this one:
+{f"- {task.dependencies}" if task.dependencies else "None"}
+
+## Resources Needed
+- Access to: ___________
+- Credentials for: ___________
+- Approval from: ___________
+
+## Notes
+{task.notes if task.notes else "No additional notes"}
+{definition_of_done}
+
+---
 
 **Start Date:** {task.start_date}  
 **End Date:** {task.end_date}  
-
-### Dependencies
-{task.dependencies if task.dependencies else "None"}
-
-### Deliverables
-{task.deliverables}
-
-### Acceptance Criteria
-{task.acceptance_criteria}
-
-### Automation Category
-{task.automation_category}
-
-### Manus Tasks
-{task.manus_tasks if task.manus_tasks != "N/A" else "None"}
-
-### Human Tasks
-{task.human_tasks if task.human_tasks != "N/A" else "None"}
-
-### Notes
-{task.notes}
+**Assignee:** {task.assignee}  
+**Status:** {task.status}  
 """
         return body
 
     def get_labels_for_task(self, task: Task) -> List[str]:
         """Generate appropriate labels for the task"""
-        labels = []
-
-        # Priority labels
-        if task.priority:
-            labels.append(f"priority:{task.priority.lower()}")
+        labels = []  # Status labels
+        if task.status:
+            status_label = task.status.lower().replace(" ", "-")
+            labels.append(f"status:{status_label}")
 
         # Phase labels
         if task.phase:
             labels.append(f"phase:{task.phase}")
-
-        # Status labels
-        if task.status:
-            labels.append(f"status:{task.status.lower().replace(' ', '-')}")
 
         # Automation category labels
         if task.automation_category:
@@ -165,7 +239,7 @@ class GitHubIssueCreator:
     def create_issue(self, task: Task) -> Optional[Dict]:
         """Create a GitHub issue for the given task"""
         issue_data = {
-            "title": f"[{task.automation_category.upper()}] {task.task_id}: {task.task_name}",
+            "title": f"{task.task_id}: [{task.automation_category.upper()}] {task.task_name}",
             "body": self.create_issue_body(task),
             "labels": self.get_labels_for_task(task),
         }
@@ -216,7 +290,7 @@ class GitHubIssueCreator:
             {"name": "phase:4", "color": "d62728", "description": "Phase 4 task"},
             # Status labels
             {
-                "name": "status:not-started",
+                "name": "status:todo",
                 "color": "e4e669",
                 "description": "Task not started",
             },
@@ -226,7 +300,7 @@ class GitHubIssueCreator:
                 "description": "Task in progress",
             },
             {
-                "name": "status:completed",
+                "name": "status:closed",
                 "color": "0e8a16",
                 "description": "Task completed",
             },
@@ -401,7 +475,7 @@ def main():
     # Default repository settings (can be overridden by environment variables)
     repo_owner = os.getenv("GITHUB_REPO_OWNER", "bianca-git")
     repo_name = os.getenv("GITHUB_REPO_NAME", "fylgja")
-    csv_file = os.getenv("TASKS_CSV_FILE", "tasks.csv")
+    csv_file = os.getenv("TASKS_CSV_FILE", "tasks_redesigned.csv")
 
     print(f"GitHub Repository: {repo_owner}/{repo_name}")
     print(f"CSV File: {csv_file}")

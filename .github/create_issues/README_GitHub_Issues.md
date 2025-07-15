@@ -2,6 +2,20 @@
 
 This script automatically creates GitHub issues from the tasks defined in `tasks.csv`.
 
+## Task ID Structure
+
+The project uses a standardized task ID format: `TA{Phase}.{Task}.{SubTask}`
+
+- **TA**: Task prefix
+- **Phase**: Two-digit phase number (01, 02, 03, 04)
+- **Task**: Three-digit task number within the phase (001, 002, 003, etc.)
+- **SubTask**: Four-digit sub-task number (0001, 0002, etc.)
+
+**Examples:**
+- `TA01.001.0001` - Phase 1, Task 1, Subtask 1
+- `TA02.005.0002` - Phase 2, Task 5, Subtask 2
+- `TA03.012.0001` - Phase 3, Task 12, Subtask 1
+
 ## Features
 
 - ✅ Creates GitHub issues with detailed task information
@@ -15,7 +29,7 @@ This script automatically creates GitHub issues from the tasks defined in `tasks
 
 1. **Python 3.6+** installed on your system
 2. **GitHub Personal Access Token** with repository access
-3. **tasks.csv** file in the same directory
+3. **tasks_redesigned.csv** file in the same directory
 
 ## Setup
 
@@ -32,7 +46,7 @@ pip install -r requirements.txt
 $env:GITHUB_TOKEN = "your_github_token_here"
 $env:GITHUB_REPO_OWNER = "bianca-git"  # Optional, defaults to bianca-git
 $env:GITHUB_REPO_NAME = "fylgja"       # Optional, defaults to fylgja
-$env:TASKS_CSV_FILE = "tasks.csv"      # Optional, defaults to tasks.csv
+$env:TASKS_CSV_FILE = "tasks_redesigned.csv"      # Optional, defaults to tasks_redesigned.csv
 ```
 
 #### Windows (Command Prompt):
@@ -40,7 +54,7 @@ $env:TASKS_CSV_FILE = "tasks.csv"      # Optional, defaults to tasks.csv
 set GITHUB_TOKEN=your_github_token_here
 set GITHUB_REPO_OWNER=bianca-git
 set GITHUB_REPO_NAME=fylgja
-set TASKS_CSV_FILE=tasks.csv
+set TASKS_CSV_FILE=tasks_redesigned.csv
 ```
 
 #### Linux/Mac:
@@ -48,7 +62,7 @@ set TASKS_CSV_FILE=tasks.csv
 export GITHUB_TOKEN="your_github_token_here"
 export GITHUB_REPO_OWNER="bianca-git"
 export GITHUB_REPO_NAME="fylgja"
-export TASKS_CSV_FILE="tasks.csv"
+export TASKS_CSV_FILE="tasks_redesigned.csv"
 ```
 
 ### 3. Create GitHub Personal Access Token
@@ -78,7 +92,7 @@ run_create_issues.bat
 
 ## What the Script Does
 
-1. **Reads tasks from CSV**: Parses the `tasks.csv` file and extracts all task information
+1. **Reads tasks from CSV**: Parses the `tasks_redesigned.csv` file and extracts all task information
 2. **Creates labels**: Sets up color-coded labels for priorities, phases, statuses, automation categories, and roles
 3. **Creates milestones**: Sets up project milestones for each phase with due dates
 4. **Creates issues**: Generates detailed GitHub issues with:
@@ -101,9 +115,9 @@ run_create_issues.bat
 - `phase:4` (Red)
 
 ### Status Labels
-- `status:not-started` (Yellow)
+- `status:todo` (Yellow)
 - `status:in-progress` (Blue)
-- `status:completed` (Green)
+- `status:closed` (Green)
 - `status:blocked` (Red)
 
 ### Automation Labels
@@ -128,7 +142,7 @@ run_create_issues.bat
 ## Issue Format
 
 Each issue will be created with:
-- **Title**: `[AUTOMATION CATEGORY] Task ID: Task Name`
+- **Title**: `Task ID: [AUTOMATION CATEGORY] Task Name` (e.g., `TA01.001.0001: [MANUS] Firebase Project Configuration - Setup`)
 - **Body**: Detailed task information including:
   - Task details (ID, phase, week, duration, assignee, priority, status)
   - Start and end dates
@@ -167,8 +181,8 @@ You can modify the script to:
    - Make sure you've set the GITHUB_TOKEN environment variable
    - Verify the token has the correct permissions
 
-2. **"Error: CSV file 'tasks.csv' not found"**
-   - Ensure the tasks.csv file is in the same directory as the script
+2. **"Error: CSV file 'tasks_redesigned.csv' not found"**
+   - Ensure the tasks_redesigned.csv file is in the same directory as the script
    - Check the TASKS_CSV_FILE environment variable if using a custom path
 
 3. **"Failed to create issue: 401"**
