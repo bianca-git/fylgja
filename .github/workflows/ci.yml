@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+# Default permissions - most restrictive
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: '18'
   FIREBASE_PROJECT_ID: fylgja-app
@@ -15,6 +19,9 @@ jobs:
   functions-test:
     name: Test Cloud Functions
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write  # Required for coverage comments
     
     steps:
     - name: Checkout code
@@ -58,6 +65,9 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # Required for uploading SARIF results
     
     steps:
     - name: Checkout code
