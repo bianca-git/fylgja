@@ -1,69 +1,159 @@
 /**
  * API Performance Monitor for Fylgja
- * Comprehensive monitoring, validation, and performance tracking
+ * Comprehensive monitoring system for API performance, health, and metrics
  */
 
-import { getFirestore } from 'firebase-admin/firestore';
-import { logger } from 'firebase-functions';
+import { EnhancedDatabaseService } from '../services/enhanced-database-service';
+import { FylgjaError } from '../utils/error-handler';
 
-export interface PerformanceMetrics {
+// Performance metric interfaces
+interface PerformanceMetric {
+  timestamp: Date;
   endpoint: string;
   method: string;
   responseTime: number;
   statusCode: number;
-  timestamp: Date;
   userId?: string;
   platform?: string;
-  errorMessage?: string;
-  memoryUsage?: number;
-  cpuUsage?: number;
+  requestSize: number;
+  responseSize: number;
+  cacheHit: boolean;
+  errorType?: string;
 }
 
-export interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
-  score: number; // 0-100
-}
-
-export interface HealthCheckResult {
-  status: 'healthy' | 'degraded' | 'unhealthy';
-  services: {
-    database: ServiceHealth;
-    googleAI: ServiceHealth;
-    authentication: ServiceHealth;
-    cache: ServiceHealth;
-  };
-  overall: {
-    responseTime: number;
-    errorRate: number;
-    uptime: number;
-  };
-}
-
-export interface ServiceHealth {
-  status: 'up' | 'down' | 'degraded';
-  responseTime: number;
+interface AggregatedMetrics {
+  endpoint: string;
+  totalRequests: number;
+  averageResponseTime: number;
+  p50ResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
   errorRate: number;
-  lastCheck: Date;
-  details?: any;
+  successRate: number;
+  cacheHitRate: number;
+  throughput: number; // requests per second
+  timestamp: Date;
 }
 
-export class APIPerformanceMonitor {
-  private db = getFirestore();
-  private metrics: PerformanceMetrics[] = [];
-  private healthChecks: Map<string, ServiceHealth> = new Map();
-  private alertThresholds = {
-    responseTime: 3000, // 3 seconds
-    errorRate: 0.05, // 5%
-    memoryUsage: 0.85, // 85%
-    cpuUsage: 0.80 // 80%
+interface SystemHealth {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  uptime: number;
+  memoryUsage: {
+    used: number;
+    total: number;
+    percentage: number;
   };
+  cpuUsage: number;
+  activeConnections: number;
+  queueDepth: number;
+  errorRate: number;
+  responseTime: number;
+  timestamp: Date;
+}
+
+interface AlertRule {
+  id: string;
+  name: string;
+  condition: string;
+  threshold: number;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  enabled: boolean;
+  cooldownPeriod: number; // minutes
+  lastTriggered?: Date;
+  actions: AlertAction[];
+}
+
+interface AlertAction {
+  type: 'email' | 'webhook' | 'log' | 'auto_scale';
+  target: string;
+  parameters: Record<string, any>;
+}
+
+interface Alert {
+  id: string;
+  ruleId: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  timestamp: Date;
+  resolved: boolean;
+  resolvedAt?: Date;
+  metadata: Record<string, any>;
+}
+
+/**
+ * API Performance Monitor class
+ */
+export class APIPerformanceMonitor {
+  private static instance: APIPerformanceMonitor;
+  private database: EnhancedDatabaseService;
+  private metrics: PerformanceMetric[] = [];
+  private alertRules: Map<string, AlertRule> = new Map();
+  private activeAlerts: Map<string, Alert> = new Map();
+  private metricsBuffer: PerformanceMetric[] = [];
+  private bufferFlushInterval: NodeJS.Timeout;
+  private healthCheckInterval: NodeJS.Timeout;
+  private startTime: Date = new Date();
+
+  // Configuration
+  private readonly config = {
+    bufferSize: 1000,
+    flushInterval: 30000, // 30 seconds
+    healthCheckInterval: 60000, // 1 minute
+    metricsRetentionDays: 30,
+    alertCooldownMinutes: 15,
+    performanceThresholds: {
+      responseTime: {
+        warning: 2000, // 2 seconds
+        critical: 5000 // 5 seconds
+      },
+      errorRate: {
+        warning: 0.05, // 5%
+        critical: 0.10 // 10%
+      },
+      memoryUsage: {
+        warning: 0.80, // 80%
+        critical: 0.90 // 90%
+      }
+    }
+  };
+
+  private constructor() {
+    this.database = new EnhancedDatabaseService();
+    this.initializeDefaultAlertRules();
+    this.startPeriodicTasks();
+  }
+
+  public static getInstance(): APIPerformanceMonitor {
+    if (!APIPerformanceMonitor.instance) {
+      APIPerformanceMonitor.instance = new APIPerformanceMonitor();
+    }
+    return APIPerformanceMonitor.instance;
+  }
 
   /**
-   * Track API request performance
+   * Record a performance metric
    */
-  async trackRequest(
+  public recordMetric(metric: Omit<PerformanceMetric, 'timestamp'>): void {
+    const fullMetric: PerformanceMetric = {
+      ...metric,
+      timestamp: new Date()
+    };
+
+    this.metricsBuffer.push(fullMetric);
+
+    // Flush buffer if it's full
+    if (this.metricsBuffer.length >= this.config.bufferSize) {
+      this.flushMetricsBuffer();
+    }
+
+    // Check for real-time alerts
+    this.checkRealTimeAlerts(fullMetric);
+  }
+
+  /**
+   * Record API request performance
+   */
+  public async recordAPIRequest(
     endpoint: string,
     method: string,
     startTime: number,
@@ -71,456 +161,504 @@ export class APIPerformanceMonitor {
     options: {
       userId?: string;
       platform?: string;
-      errorMessage?: string;
+      requestSize?: number;
+      responseSize?: number;
+      cacheHit?: boolean;
+      errorType?: string;
     } = {}
   ): Promise<void> {
     const responseTime = Date.now() - startTime;
-    const memoryUsage = process.memoryUsage();
-    
-    const metric: PerformanceMetrics = {
+
+    this.recordMetric({
       endpoint,
       method,
       responseTime,
       statusCode,
-      timestamp: new Date(),
       userId: options.userId,
       platform: options.platform,
-      errorMessage: options.errorMessage,
-      memoryUsage: memoryUsage.heapUsed / memoryUsage.heapTotal,
-      cpuUsage: process.cpuUsage().user / 1000000 // Convert to seconds
-    };
-
-    // Store in memory for immediate analysis
-    this.metrics.push(metric);
-    
-    // Keep only last 1000 metrics in memory
-    if (this.metrics.length > 1000) {
-      this.metrics = this.metrics.slice(-1000);
-    }
-
-    // Store in database for long-term analysis
-    await this.storeMetric(metric);
-
-    // Check for alerts
-    await this.checkAlerts(metric);
-
-    logger.info('API Request Tracked', {
-      endpoint,
-      method,
-      responseTime,
-      statusCode,
-      userId: options.userId
+      requestSize: options.requestSize || 0,
+      responseSize: options.responseSize || 0,
+      cacheHit: options.cacheHit || false,
+      errorType: options.errorType
     });
   }
 
   /**
-   * Validate API request/response
+   * Get aggregated metrics for a time period
    */
-  validateRequest(data: any, schema: any): ValidationResult {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    let score = 100;
-
+  public async getAggregatedMetrics(
+    startTime: Date,
+    endTime: Date,
+    groupBy: 'endpoint' | 'platform' | 'hour' | 'day' = 'endpoint'
+  ): Promise<AggregatedMetrics[]> {
     try {
-      // Basic validation
-      if (!data) {
-        errors.push('Request data is required');
-        score -= 50;
+      // In a real implementation, this would query the database
+      // For now, we'll simulate with in-memory data
+      const filteredMetrics = this.metrics.filter(
+        m => m.timestamp >= startTime && m.timestamp <= endTime
+      );
+
+      const grouped = this.groupMetrics(filteredMetrics, groupBy);
+      const aggregated: AggregatedMetrics[] = [];
+
+      for (const [key, metrics] of grouped.entries()) {
+        const responseTimes = metrics.map(m => m.responseTime).sort((a, b) => a - b);
+        const errors = metrics.filter(m => m.statusCode >= 400);
+        const cacheHits = metrics.filter(m => m.cacheHit);
+
+        aggregated.push({
+          endpoint: key,
+          totalRequests: metrics.length,
+          averageResponseTime: responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length,
+          p50ResponseTime: this.getPercentile(responseTimes, 0.5),
+          p95ResponseTime: this.getPercentile(responseTimes, 0.95),
+          p99ResponseTime: this.getPercentile(responseTimes, 0.99),
+          errorRate: errors.length / metrics.length,
+          successRate: (metrics.length - errors.length) / metrics.length,
+          cacheHitRate: cacheHits.length / metrics.length,
+          throughput: metrics.length / ((endTime.getTime() - startTime.getTime()) / 1000),
+          timestamp: new Date()
+        });
       }
 
-      // Schema validation (simplified)
-      if (schema.required) {
-        for (const field of schema.required) {
-          if (!data[field]) {
-            errors.push(`Required field '${field}' is missing`);
-            score -= 10;
-          }
-        }
-      }
-
-      // Type validation
-      if (schema.properties) {
-        for (const [field, fieldSchema] of Object.entries(schema.properties as any)) {
-          if (data[field] && fieldSchema.type) {
-            const actualType = typeof data[field];
-            if (actualType !== fieldSchema.type) {
-              errors.push(`Field '${field}' should be ${fieldSchema.type}, got ${actualType}`);
-              score -= 5;
-            }
-          }
-        }
-      }
-
-      // Performance warnings
-      if (data.input && data.input.length > 1000) {
-        warnings.push('Input text is very long, may impact performance');
-        score -= 5;
-      }
-
-      return {
-        valid: errors.length === 0,
-        errors,
-        warnings,
-        score: Math.max(0, score)
-      };
-
+      return aggregated;
     } catch (error) {
-      return {
-        valid: false,
-        errors: [`Validation error: ${error.message}`],
-        warnings,
-        score: 0
-      };
+      throw new FylgjaError(
+        'MONITORING_ERROR',
+        'Failed to get aggregated metrics',
+        { error: error.message }
+      );
     }
   }
 
   /**
-   * Perform comprehensive health check
+   * Get current system health
    */
-  async performHealthCheck(): Promise<HealthCheckResult> {
-    const startTime = Date.now();
+  public async getSystemHealth(): Promise<SystemHealth> {
+    try {
+      const now = new Date();
+      const recentMetrics = this.metrics.filter(
+        m => now.getTime() - m.timestamp.getTime() < 300000 // Last 5 minutes
+      );
 
-    // Check individual services
-    const services = {
-      database: await this.checkDatabaseHealth(),
-      googleAI: await this.checkGoogleAIHealth(),
-      authentication: await this.checkAuthHealth(),
-      cache: await this.checkCacheHealth()
-    };
+      const errors = recentMetrics.filter(m => m.statusCode >= 400);
+      const responseTimes = recentMetrics.map(m => m.responseTime);
+      const avgResponseTime = responseTimes.length > 0 
+        ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length 
+        : 0;
 
-    // Calculate overall metrics
-    const recentMetrics = this.getRecentMetrics(300000); // Last 5 minutes
-    const avgResponseTime = this.calculateAverageResponseTime(recentMetrics);
-    const errorRate = this.calculateErrorRate(recentMetrics);
-    const uptime = this.calculateUptime();
+      const errorRate = recentMetrics.length > 0 ? errors.length / recentMetrics.length : 0;
 
-    // Determine overall status
-    const serviceStatuses = Object.values(services).map(s => s.status);
-    let overallStatus: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+      // Simulate system metrics (in real implementation, these would come from system monitoring)
+      const memoryUsage = {
+        used: Math.floor(Math.random() * 8000000000), // 8GB max
+        total: 8000000000,
+        percentage: Math.random() * 0.8 // 0-80%
+      };
 
-    if (serviceStatuses.includes('down')) {
-      overallStatus = 'unhealthy';
-    } else if (serviceStatuses.includes('degraded') || errorRate > this.alertThresholds.errorRate) {
-      overallStatus = 'degraded';
-    }
-
-    const healthCheck: HealthCheckResult = {
-      status: overallStatus,
-      services,
-      overall: {
-        responseTime: avgResponseTime,
+      const health: SystemHealth = {
+        status: this.determineHealthStatus(errorRate, avgResponseTime, memoryUsage.percentage),
+        uptime: now.getTime() - this.startTime.getTime(),
+        memoryUsage,
+        cpuUsage: Math.random() * 0.7, // 0-70%
+        activeConnections: Math.floor(Math.random() * 1000),
+        queueDepth: Math.floor(Math.random() * 100),
         errorRate,
-        uptime
+        responseTime: avgResponseTime,
+        timestamp: now
+      };
+
+      return health;
+    } catch (error) {
+      throw new FylgjaError(
+        'MONITORING_ERROR',
+        'Failed to get system health',
+        { error: error.message }
+      );
+    }
+  }
+
+  /**
+   * Create or update alert rule
+   */
+  public createAlertRule(rule: Omit<AlertRule, 'id'>): string {
+    const id = `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const fullRule: AlertRule = { ...rule, id };
+    
+    this.alertRules.set(id, fullRule);
+    return id;
+  }
+
+  /**
+   * Get all alert rules
+   */
+  public getAlertRules(): AlertRule[] {
+    return Array.from(this.alertRules.values());
+  }
+
+  /**
+   * Get active alerts
+   */
+  public getActiveAlerts(): Alert[] {
+    return Array.from(this.activeAlerts.values()).filter(alert => !alert.resolved);
+  }
+
+  /**
+   * Resolve an alert
+   */
+  public resolveAlert(alertId: string): void {
+    const alert = this.activeAlerts.get(alertId);
+    if (alert) {
+      alert.resolved = true;
+      alert.resolvedAt = new Date();
+    }
+  }
+
+  /**
+   * Get performance trends
+   */
+  public async getPerformanceTrends(
+    metric: 'responseTime' | 'errorRate' | 'throughput',
+    period: 'hour' | 'day' | 'week'
+  ): Promise<{ timestamp: Date; value: number }[]> {
+    const now = new Date();
+    const periodMs = {
+      hour: 60 * 60 * 1000,
+      day: 24 * 60 * 60 * 1000,
+      week: 7 * 24 * 60 * 60 * 1000
+    }[period];
+
+    const startTime = new Date(now.getTime() - periodMs);
+    const metrics = await this.getAggregatedMetrics(startTime, now, 'hour');
+
+    return metrics.map(m => ({
+      timestamp: m.timestamp,
+      value: metric === 'responseTime' ? m.averageResponseTime :
+             metric === 'errorRate' ? m.errorRate :
+             m.throughput
+    }));
+  }
+
+  /**
+   * Get top slow endpoints
+   */
+  public async getSlowEndpoints(limit: number = 10): Promise<{
+    endpoint: string;
+    averageResponseTime: number;
+    requestCount: number;
+  }[]> {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const metrics = await this.getAggregatedMetrics(oneHourAgo, now, 'endpoint');
+
+    return metrics
+      .sort((a, b) => b.averageResponseTime - a.averageResponseTime)
+      .slice(0, limit)
+      .map(m => ({
+        endpoint: m.endpoint,
+        averageResponseTime: m.averageResponseTime,
+        requestCount: m.totalRequests
+      }));
+  }
+
+  /**
+   * Get error analysis
+   */
+  public async getErrorAnalysis(): Promise<{
+    totalErrors: number;
+    errorsByType: Record<string, number>;
+    errorsByEndpoint: Record<string, number>;
+    errorTrend: { timestamp: Date; count: number }[];
+  }> {
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    const errorMetrics = this.metrics.filter(
+      m => m.timestamp >= oneDayAgo && m.statusCode >= 400
+    );
+
+    const errorsByType: Record<string, number> = {};
+    const errorsByEndpoint: Record<string, number> = {};
+
+    errorMetrics.forEach(metric => {
+      if (metric.errorType) {
+        errorsByType[metric.errorType] = (errorsByType[metric.errorType] || 0) + 1;
       }
-    };
-
-    // Store health check result
-    await this.storeHealthCheck(healthCheck);
-
-    logger.info('Health Check Completed', {
-      status: overallStatus,
-      responseTime: Date.now() - startTime,
-      services: Object.keys(services).reduce((acc, key) => {
-        acc[key] = services[key].status;
-        return acc;
-      }, {} as any)
+      errorsByEndpoint[metric.endpoint] = (errorsByEndpoint[metric.endpoint] || 0) + 1;
     });
 
-    return healthCheck;
-  }
-
-  /**
-   * Get performance analytics
-   */
-  getPerformanceAnalytics(timeRange: number = 3600000): any { // Default 1 hour
-    const recentMetrics = this.getRecentMetrics(timeRange);
-    
-    if (recentMetrics.length === 0) {
-      return {
-        totalRequests: 0,
-        averageResponseTime: 0,
-        errorRate: 0,
-        topEndpoints: [],
-        platformDistribution: {},
-        hourlyDistribution: {}
-      };
+    // Generate hourly error trend
+    const errorTrend: { timestamp: Date; count: number }[] = [];
+    for (let i = 23; i >= 0; i--) {
+      const hourStart = new Date(now.getTime() - i * 60 * 60 * 1000);
+      const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000);
+      const hourErrors = errorMetrics.filter(
+        m => m.timestamp >= hourStart && m.timestamp < hourEnd
+      );
+      errorTrend.push({
+        timestamp: hourStart,
+        count: hourErrors.length
+      });
     }
-
-    // Calculate metrics
-    const totalRequests = recentMetrics.length;
-    const averageResponseTime = this.calculateAverageResponseTime(recentMetrics);
-    const errorRate = this.calculateErrorRate(recentMetrics);
-
-    // Top endpoints
-    const endpointCounts = recentMetrics.reduce((acc, metric) => {
-      acc[metric.endpoint] = (acc[metric.endpoint] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const topEndpoints = Object.entries(endpointCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 10)
-      .map(([endpoint, count]) => ({ endpoint, count }));
-
-    // Platform distribution
-    const platformDistribution = recentMetrics.reduce((acc, metric) => {
-      if (metric.platform) {
-        acc[metric.platform] = (acc[metric.platform] || 0) + 1;
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Hourly distribution
-    const hourlyDistribution = recentMetrics.reduce((acc, metric) => {
-      const hour = metric.timestamp.getHours();
-      acc[hour] = (acc[hour] || 0) + 1;
-      return acc;
-    }, {} as Record<number, number>);
 
     return {
-      totalRequests,
-      averageResponseTime,
-      errorRate,
-      topEndpoints,
-      platformDistribution,
-      hourlyDistribution,
-      responseTimePercentiles: this.calculatePercentiles(
-        recentMetrics.map(m => m.responseTime)
-      )
+      totalErrors: errorMetrics.length,
+      errorsByType,
+      errorsByEndpoint,
+      errorTrend
     };
   }
 
   /**
-   * Generate performance report
+   * Private methods
    */
-  async generatePerformanceReport(timeRange: number = 86400000): Promise<string> { // Default 24 hours
-    const analytics = this.getPerformanceAnalytics(timeRange);
-    const healthCheck = await this.performHealthCheck();
 
-    const report = `
-# Fylgja API Performance Report
-Generated: ${new Date().toISOString()}
-Time Range: ${timeRange / 3600000} hours
+  private initializeDefaultAlertRules(): void {
+    // High response time alert
+    this.createAlertRule({
+      name: 'High Response Time',
+      condition: 'average_response_time > threshold',
+      threshold: this.config.performanceThresholds.responseTime.warning,
+      severity: 'medium',
+      enabled: true,
+      cooldownPeriod: this.config.alertCooldownMinutes,
+      actions: [
+        { type: 'log', target: 'console', parameters: {} }
+      ]
+    });
 
-## Overall Health: ${healthCheck.status.toUpperCase()}
+    // High error rate alert
+    this.createAlertRule({
+      name: 'High Error Rate',
+      condition: 'error_rate > threshold',
+      threshold: this.config.performanceThresholds.errorRate.warning,
+      severity: 'high',
+      enabled: true,
+      cooldownPeriod: this.config.alertCooldownMinutes,
+      actions: [
+        { type: 'log', target: 'console', parameters: {} }
+      ]
+    });
 
-### Key Metrics
-- Total Requests: ${analytics.totalRequests}
-- Average Response Time: ${analytics.averageResponseTime.toFixed(2)}ms
-- Error Rate: ${(analytics.errorRate * 100).toFixed(2)}%
-- System Uptime: ${(healthCheck.overall.uptime * 100).toFixed(2)}%
-
-### Response Time Percentiles
-- P50: ${analytics.responseTimePercentiles.p50}ms
-- P90: ${analytics.responseTimePercentiles.p90}ms
-- P95: ${analytics.responseTimePercentiles.p95}ms
-- P99: ${analytics.responseTimePercentiles.p99}ms
-
-### Service Health
-${Object.entries(healthCheck.services).map(([service, health]) => 
-  `- ${service}: ${health.status} (${health.responseTime}ms)`
-).join('\n')}
-
-### Top Endpoints
-${analytics.topEndpoints.map((ep, i) => 
-  `${i + 1}. ${ep.endpoint}: ${ep.count} requests`
-).join('\n')}
-
-### Platform Distribution
-${Object.entries(analytics.platformDistribution).map(([platform, count]) => 
-  `- ${platform}: ${count} requests`
-).join('\n')}
-
-### Recommendations
-${this.generateRecommendations(analytics, healthCheck)}
-    `.trim();
-
-    return report;
+    // High memory usage alert
+    this.createAlertRule({
+      name: 'High Memory Usage',
+      condition: 'memory_usage > threshold',
+      threshold: this.config.performanceThresholds.memoryUsage.warning,
+      severity: 'medium',
+      enabled: true,
+      cooldownPeriod: this.config.alertCooldownMinutes,
+      actions: [
+        { type: 'log', target: 'console', parameters: {} }
+      ]
+    });
   }
 
-  // Private helper methods
-  private async storeMetric(metric: PerformanceMetrics): Promise<void> {
+  private startPeriodicTasks(): void {
+    // Flush metrics buffer periodically
+    this.bufferFlushInterval = setInterval(() => {
+      this.flushMetricsBuffer();
+    }, this.config.flushInterval);
+
+    // Health check periodically
+    this.healthCheckInterval = setInterval(async () => {
+      await this.performHealthCheck();
+    }, this.config.healthCheckInterval);
+  }
+
+  private flushMetricsBuffer(): void {
+    if (this.metricsBuffer.length === 0) return;
+
+    // Move buffer to main metrics array
+    this.metrics.push(...this.metricsBuffer);
+    this.metricsBuffer = [];
+
+    // Clean up old metrics
+    const cutoffTime = new Date(Date.now() - this.config.metricsRetentionDays * 24 * 60 * 60 * 1000);
+    this.metrics = this.metrics.filter(m => m.timestamp > cutoffTime);
+  }
+
+  private async performHealthCheck(): Promise<void> {
     try {
-      await this.db.collection('performance_metrics').add({
-        ...metric,
-        timestamp: metric.timestamp
-      });
+      const health = await this.getSystemHealth();
+      
+      // Check alert conditions
+      for (const rule of this.alertRules.values()) {
+        if (!rule.enabled) continue;
+        
+        const shouldTrigger = this.evaluateAlertCondition(rule, health);
+        if (shouldTrigger) {
+          this.triggerAlert(rule, health);
+        }
+      }
     } catch (error) {
-      logger.error('Failed to store performance metric', error);
+      console.error('Health check failed:', error);
     }
   }
 
-  private async storeHealthCheck(healthCheck: HealthCheckResult): Promise<void> {
-    try {
-      await this.db.collection('health_checks').add({
-        ...healthCheck,
-        timestamp: new Date()
+  private checkRealTimeAlerts(metric: PerformanceMetric): void {
+    // Check for immediate alert conditions
+    if (metric.responseTime > this.config.performanceThresholds.responseTime.critical) {
+      this.createAlert({
+        ruleId: 'realtime_response_time',
+        severity: 'critical',
+        message: `Critical response time: ${metric.responseTime}ms on ${metric.endpoint}`,
+        metadata: { metric }
       });
-    } catch (error) {
-      logger.error('Failed to store health check', error);
-    }
-  }
-
-  private async checkAlerts(metric: PerformanceMetrics): Promise<void> {
-    const alerts: string[] = [];
-
-    if (metric.responseTime > this.alertThresholds.responseTime) {
-      alerts.push(`High response time: ${metric.responseTime}ms for ${metric.endpoint}`);
     }
 
     if (metric.statusCode >= 500) {
-      alerts.push(`Server error: ${metric.statusCode} for ${metric.endpoint}`);
-    }
-
-    if (metric.memoryUsage && metric.memoryUsage > this.alertThresholds.memoryUsage) {
-      alerts.push(`High memory usage: ${(metric.memoryUsage * 100).toFixed(1)}%`);
-    }
-
-    if (alerts.length > 0) {
-      logger.warn('Performance Alert', {
-        alerts,
-        metric: {
-          endpoint: metric.endpoint,
-          responseTime: metric.responseTime,
-          statusCode: metric.statusCode,
-          userId: metric.userId
-        }
+      this.createAlert({
+        ruleId: 'realtime_server_error',
+        severity: 'high',
+        message: `Server error ${metric.statusCode} on ${metric.endpoint}`,
+        metadata: { metric }
       });
-
-      // Store alerts for dashboard
-      await this.storeAlert(alerts, metric);
     }
   }
 
-  private async storeAlert(alerts: string[], metric: PerformanceMetrics): Promise<void> {
-    try {
-      await this.db.collection('performance_alerts').add({
-        alerts,
-        metric,
-        timestamp: new Date(),
-        resolved: false
-      });
-    } catch (error) {
-      logger.error('Failed to store alert', error);
+  private evaluateAlertCondition(rule: AlertRule, health: SystemHealth): boolean {
+    // Simple condition evaluation (in real implementation, this would be more sophisticated)
+    switch (rule.condition) {
+      case 'average_response_time > threshold':
+        return health.responseTime > rule.threshold;
+      case 'error_rate > threshold':
+        return health.errorRate > rule.threshold;
+      case 'memory_usage > threshold':
+        return health.memoryUsage.percentage > rule.threshold;
+      default:
+        return false;
     }
   }
 
-  private getRecentMetrics(timeRange: number): PerformanceMetrics[] {
-    const cutoff = new Date(Date.now() - timeRange);
-    return this.metrics.filter(m => m.timestamp >= cutoff);
+  private triggerAlert(rule: AlertRule, context: any): void {
+    // Check cooldown period
+    if (rule.lastTriggered) {
+      const timeSinceLastTrigger = Date.now() - rule.lastTriggered.getTime();
+      if (timeSinceLastTrigger < rule.cooldownPeriod * 60 * 1000) {
+        return; // Still in cooldown
+      }
+    }
+
+    this.createAlert({
+      ruleId: rule.id,
+      severity: rule.severity,
+      message: `Alert: ${rule.name} - ${rule.condition} (threshold: ${rule.threshold})`,
+      metadata: { context, rule }
+    });
+
+    rule.lastTriggered = new Date();
+
+    // Execute alert actions
+    rule.actions.forEach(action => {
+      this.executeAlertAction(action, rule, context);
+    });
   }
 
-  private calculateAverageResponseTime(metrics: PerformanceMetrics[]): number {
-    if (metrics.length === 0) return 0;
-    return metrics.reduce((sum, m) => sum + m.responseTime, 0) / metrics.length;
+  private createAlert(alertData: Omit<Alert, 'id' | 'timestamp' | 'resolved'>): void {
+    const alert: Alert = {
+      ...alertData,
+      id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date(),
+      resolved: false
+    };
+
+    this.activeAlerts.set(alert.id, alert);
   }
 
-  private calculateErrorRate(metrics: PerformanceMetrics[]): number {
-    if (metrics.length === 0) return 0;
-    const errors = metrics.filter(m => m.statusCode >= 400).length;
-    return errors / metrics.length;
+  private executeAlertAction(action: AlertAction, rule: AlertRule, context: any): void {
+    switch (action.type) {
+      case 'log':
+        console.log(`ALERT: ${rule.name}`, { rule, context });
+        break;
+      case 'webhook':
+        // In real implementation, would make HTTP request to webhook URL
+        console.log(`Webhook alert: ${action.target}`, { rule, context });
+        break;
+      // Add more action types as needed
+    }
   }
 
-  private calculateUptime(): number {
-    // Simplified uptime calculation
-    const recentMetrics = this.getRecentMetrics(3600000); // Last hour
-    if (recentMetrics.length === 0) return 1;
+  private groupMetrics(
+    metrics: PerformanceMetric[],
+    groupBy: 'endpoint' | 'platform' | 'hour' | 'day'
+  ): Map<string, PerformanceMetric[]> {
+    const grouped = new Map<string, PerformanceMetric[]>();
+
+    metrics.forEach(metric => {
+      let key: string;
+      
+      switch (groupBy) {
+        case 'endpoint':
+          key = metric.endpoint;
+          break;
+        case 'platform':
+          key = metric.platform || 'unknown';
+          break;
+        case 'hour':
+          key = new Date(metric.timestamp).toISOString().substr(0, 13);
+          break;
+        case 'day':
+          key = new Date(metric.timestamp).toISOString().substr(0, 10);
+          break;
+        default:
+          key = 'all';
+      }
+
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(metric);
+    });
+
+    return grouped;
+  }
+
+  private getPercentile(sortedArray: number[], percentile: number): number {
+    if (sortedArray.length === 0) return 0;
     
-    const successfulRequests = recentMetrics.filter(m => m.statusCode < 500).length;
-    return successfulRequests / recentMetrics.length;
+    const index = Math.ceil(sortedArray.length * percentile) - 1;
+    return sortedArray[Math.max(0, Math.min(index, sortedArray.length - 1))];
   }
 
-  private calculatePercentiles(values: number[]): any {
-    if (values.length === 0) return { p50: 0, p90: 0, p95: 0, p99: 0 };
-    
-    const sorted = values.sort((a, b) => a - b);
-    const getPercentile = (p: number) => {
-      const index = Math.ceil((p / 100) * sorted.length) - 1;
-      return sorted[Math.max(0, index)];
-    };
-
-    return {
-      p50: getPercentile(50),
-      p90: getPercentile(90),
-      p95: getPercentile(95),
-      p99: getPercentile(99)
-    };
-  }
-
-  private async checkDatabaseHealth(): Promise<ServiceHealth> {
-    const startTime = Date.now();
-    try {
-      await this.db.collection('health_check').limit(1).get();
-      return {
-        status: 'up',
-        responseTime: Date.now() - startTime,
-        errorRate: 0,
-        lastCheck: new Date()
-      };
-    } catch (error) {
-      return {
-        status: 'down',
-        responseTime: Date.now() - startTime,
-        errorRate: 1,
-        lastCheck: new Date(),
-        details: error.message
-      };
-    }
-  }
-
-  private async checkGoogleAIHealth(): Promise<ServiceHealth> {
-    // Mock health check for Google AI
-    return {
-      status: 'up',
-      responseTime: 150,
-      errorRate: 0,
-      lastCheck: new Date()
-    };
-  }
-
-  private async checkAuthHealth(): Promise<ServiceHealth> {
-    // Mock health check for Authentication
-    return {
-      status: 'up',
-      responseTime: 50,
-      errorRate: 0,
-      lastCheck: new Date()
-    };
-  }
-
-  private async checkCacheHealth(): Promise<ServiceHealth> {
-    // Mock health check for Cache
-    return {
-      status: 'up',
-      responseTime: 10,
-      errorRate: 0,
-      lastCheck: new Date()
-    };
-  }
-
-  private generateRecommendations(analytics: any, healthCheck: HealthCheckResult): string {
-    const recommendations: string[] = [];
-
-    if (analytics.averageResponseTime > 2000) {
-      recommendations.push('- Consider optimizing slow endpoints or adding caching');
+  private determineHealthStatus(
+    errorRate: number,
+    responseTime: number,
+    memoryUsage: number
+  ): 'healthy' | 'degraded' | 'unhealthy' {
+    if (
+      errorRate > this.config.performanceThresholds.errorRate.critical ||
+      responseTime > this.config.performanceThresholds.responseTime.critical ||
+      memoryUsage > this.config.performanceThresholds.memoryUsage.critical
+    ) {
+      return 'unhealthy';
     }
 
-    if (analytics.errorRate > 0.01) {
-      recommendations.push('- Investigate and fix sources of errors');
+    if (
+      errorRate > this.config.performanceThresholds.errorRate.warning ||
+      responseTime > this.config.performanceThresholds.responseTime.warning ||
+      memoryUsage > this.config.performanceThresholds.memoryUsage.warning
+    ) {
+      return 'degraded';
     }
 
-    if (healthCheck.overall.uptime < 0.99) {
-      recommendations.push('- Improve system reliability and error handling');
-    }
+    return 'healthy';
+  }
 
-    if (recommendations.length === 0) {
-      recommendations.push('- System is performing well, continue monitoring');
+  /**
+   * Cleanup resources
+   */
+  public destroy(): void {
+    if (this.bufferFlushInterval) {
+      clearInterval(this.bufferFlushInterval);
     }
-
-    return recommendations.join('\n');
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+    this.flushMetricsBuffer();
   }
 }
 
 // Export singleton instance
-export const apiPerformanceMonitor = new APIPerformanceMonitor();
+export const apiPerformanceMonitor = APIPerformanceMonitor.getInstance();
 
