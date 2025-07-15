@@ -1,0 +1,326 @@
+# Cloud Scheduler Configuration for Fylgja
+# This file defines all scheduled tasks and their configurations
+
+# Global scheduler settings
+global:
+  project_id: "fylgja-app"
+  region: "us-central1"
+  timezone: "UTC"
+  max_retry_attempts: 3
+  retry_min_backoff_duration: "60s"
+  retry_max_backoff_duration: "300s"
+  retry_max_doublings: 3
+
+# Daily Check-in Schedules
+daily_checkins:
+  # Morning check-ins (6 AM in various timezones)
+  morning_checkins_utc:
+    name: "fylgja-daily-checkins-morning-utc"
+    description: "Daily morning check-ins for UTC timezone users"
+    schedule: "0 6 * * *"  # 6:00 AM UTC daily
+    timezone: "UTC"
+    topic: "fylgja-daily-checkins"
+    payload:
+      timezone: "UTC"
+      time_of_day: "morning"
+      question_style: "energetic"
+    
+  morning_checkins_est:
+    name: "fylgja-daily-checkins-morning-est"
+    description: "Daily morning check-ins for EST timezone users"
+    schedule: "0 11 * * *"  # 6:00 AM EST (11:00 UTC)
+    timezone: "UTC"
+    topic: "fylgja-daily-checkins"
+    payload:
+      timezone: "America/New_York"
+      time_of_day: "morning"
+      question_style: "energetic"
+    
+  morning_checkins_pst:
+    name: "fylgja-daily-checkins-morning-pst"
+    description: "Daily morning check-ins for PST timezone users"
+    schedule: "0 14 * * *"  # 6:00 AM PST (14:00 UTC)
+    timezone: "UTC"
+    topic: "fylgja-daily-checkins"
+    payload:
+      timezone: "America/Los_Angeles"
+      time_of_day: "morning"
+      question_style: "energetic"
+  
+  # Evening check-ins (7 PM in various timezones)
+  evening_checkins_utc:
+    name: "fylgja-daily-checkins-evening-utc"
+    description: "Daily evening check-ins for UTC timezone users"
+    schedule: "0 19 * * *"  # 7:00 PM UTC daily
+    timezone: "UTC"
+    topic: "fylgja-daily-checkins"
+    payload:
+      timezone: "UTC"
+      time_of_day: "evening"
+      question_style: "reflective"
+    
+  evening_checkins_est:
+    name: "fylgja-daily-checkins-evening-est"
+    description: "Daily evening check-ins for EST timezone users"
+    schedule: "0 0 * * *"   # 7:00 PM EST (00:00 UTC next day)
+    timezone: "UTC"
+    topic: "fylgja-daily-checkins"
+    payload:
+      timezone: "America/New_York"
+      time_of_day: "evening"
+      question_style: "reflective"
+    
+  evening_checkins_pst:
+    name: "fylgja-daily-checkins-evening-pst"
+    description: "Daily evening check-ins for PST timezone users"
+    schedule: "0 3 * * *"   # 7:00 PM PST (03:00 UTC next day)
+    timezone: "UTC"
+    topic: "fylgja-daily-checkins"
+    payload:
+      timezone: "America/Los_Angeles"
+      time_of_day: "evening"
+      question_style: "reflective"
+
+# Reminder Schedules
+reminders:
+  # Task reminders - multiple times per day
+  task_reminders_morning:
+    name: "fylgja-task-reminders-morning"
+    description: "Morning task reminders"
+    schedule: "0 9 * * *"   # 9:00 AM UTC daily
+    timezone: "UTC"
+    topic: "fylgja-reminders"
+    payload:
+      reminderType: "task_reminder"
+      time_of_day: "morning"
+      priority: "medium"
+  
+  task_reminders_afternoon:
+    name: "fylgja-task-reminders-afternoon"
+    description: "Afternoon task reminders"
+    schedule: "0 14 * * *"  # 2:00 PM UTC daily
+    timezone: "UTC"
+    topic: "fylgja-reminders"
+    payload:
+      reminderType: "task_reminder"
+      time_of_day: "afternoon"
+      priority: "medium"
+  
+  # Goal reminders - weekly
+  goal_reminders_weekly:
+    name: "fylgja-goal-reminders-weekly"
+    description: "Weekly goal progress reminders"
+    schedule: "0 10 * * 1"  # 10:00 AM UTC every Monday
+    timezone: "UTC"
+    topic: "fylgja-reminders"
+    payload:
+      reminderType: "goal_reminder"
+      frequency: "weekly"
+      priority: "high"
+  
+  # Reflection reminders - bi-weekly
+  reflection_reminders:
+    name: "fylgja-reflection-reminders"
+    description: "Bi-weekly reflection prompts"
+    schedule: "0 18 * * 0,3"  # 6:00 PM UTC on Sundays and Wednesdays
+    timezone: "UTC"
+    topic: "fylgja-reminders"
+    payload:
+      reminderType: "reflection_reminder"
+      frequency: "bi-weekly"
+      priority: "medium"
+
+# Summary Generation Schedules
+summaries:
+  # Weekly summaries
+  weekly_summaries:
+    name: "fylgja-weekly-summaries"
+    description: "Generate weekly summaries for users"
+    schedule: "0 8 * * 0"   # 8:00 AM UTC every Sunday
+    timezone: "UTC"
+    topic: "fylgja-weekly-summaries"
+    payload:
+      summaryType: "weekly"
+      includeInsights: true
+      includeGoalProgress: true
+      includeReflections: true
+  
+  # Monthly summaries
+  monthly_summaries:
+    name: "fylgja-monthly-summaries"
+    description: "Generate monthly summaries for users"
+    schedule: "0 9 1 * *"   # 9:00 AM UTC on the 1st of every month
+    timezone: "UTC"
+    topic: "fylgja-monthly-summaries"
+    payload:
+      summaryType: "monthly"
+      includeInsights: true
+      includeGoalProgress: true
+      includeReflections: true
+      includeTrends: true
+
+# Maintenance Schedules
+maintenance:
+  # Database cleanup - daily
+  database_cleanup:
+    name: "fylgja-database-cleanup"
+    description: "Daily database cleanup and optimization"
+    schedule: "0 2 * * *"   # 2:00 AM UTC daily
+    timezone: "UTC"
+    topic: "fylgja-maintenance"
+    payload:
+      maintenanceType: "database_cleanup"
+      priority: "medium"
+      retentionDays: 90
+  
+  # Cache refresh - every 6 hours
+  cache_refresh:
+    name: "fylgja-cache-refresh"
+    description: "Refresh system caches"
+    schedule: "0 */6 * * *" # Every 6 hours
+    timezone: "UTC"
+    topic: "fylgja-maintenance"
+    payload:
+      maintenanceType: "cache_refresh"
+      priority: "low"
+  
+  # Performance analysis - daily
+  performance_analysis:
+    name: "fylgja-performance-analysis"
+    description: "Daily performance analysis and reporting"
+    schedule: "0 3 * * *"   # 3:00 AM UTC daily
+    timezone: "UTC"
+    topic: "fylgja-maintenance"
+    payload:
+      maintenanceType: "performance_analysis"
+      priority: "medium"
+      analysisWindow: "24h"
+  
+  # Health check - every 15 minutes
+  health_check:
+    name: "fylgja-health-check"
+    description: "System health monitoring"
+    schedule: "*/15 * * * *" # Every 15 minutes
+    timezone: "UTC"
+    topic: "fylgja-maintenance"
+    payload:
+      maintenanceType: "health_check"
+      priority: "high"
+      checkComponents: ["database", "ai_service", "cache", "scheduler"]
+
+# Proactive Engagement Schedules
+proactive_engagement:
+  # Check for inactive users - daily
+  inactive_user_engagement:
+    name: "fylgja-inactive-user-engagement"
+    description: "Engage users who haven't been active recently"
+    schedule: "0 16 * * *"  # 4:00 PM UTC daily
+    timezone: "UTC"
+    topic: "fylgja-proactive-engagement"
+    payload:
+      engagementType: "inactive_user"
+      inactivityThreshold: "3d"
+      priority: "medium"
+  
+  # Motivational check-ins - weekly
+  motivational_checkins:
+    name: "fylgja-motivational-checkins"
+    description: "Weekly motivational messages for engaged users"
+    schedule: "0 15 * * 5"  # 3:00 PM UTC every Friday
+    timezone: "UTC"
+    topic: "fylgja-proactive-engagement"
+    payload:
+      engagementType: "motivational"
+      targetAudience: "active_users"
+      priority: "low"
+  
+  # Goal progress nudges - bi-weekly
+  goal_progress_nudges:
+    name: "fylgja-goal-progress-nudges"
+    description: "Bi-weekly goal progress encouragement"
+    schedule: "0 12 * * 2,5" # 12:00 PM UTC on Tuesdays and Fridays
+    timezone: "UTC"
+    topic: "fylgja-proactive-engagement"
+    payload:
+      engagementType: "goal_progress"
+      targetAudience: "users_with_goals"
+      priority: "medium"
+
+# Special Event Schedules
+special_events:
+  # New Year reflection
+  new_year_reflection:
+    name: "fylgja-new-year-reflection"
+    description: "Special New Year reflection prompt"
+    schedule: "0 12 1 1 *"  # 12:00 PM UTC on January 1st
+    timezone: "UTC"
+    topic: "fylgja-reminders"
+    payload:
+      reminderType: "special_event"
+      eventType: "new_year"
+      priority: "high"
+  
+  # Mid-year review
+  mid_year_review:
+    name: "fylgja-mid-year-review"
+    description: "Mid-year goal and progress review"
+    schedule: "0 10 1 7 *"  # 10:00 AM UTC on July 1st
+    timezone: "UTC"
+    topic: "fylgja-reminders"
+    payload:
+      reminderType: "special_event"
+      eventType: "mid_year_review"
+      priority: "high"
+
+# Error Handling and Retry Configuration
+error_handling:
+  dead_letter_topic: "fylgja-scheduler-dead-letter"
+  max_delivery_attempts: 5
+  min_backoff_duration: "10s"
+  max_backoff_duration: "600s"
+  max_doublings: 16
+
+# Monitoring and Alerting
+monitoring:
+  success_rate_threshold: 0.95
+  error_rate_threshold: 0.05
+  execution_time_threshold: "300s"
+  alert_topics:
+    - "fylgja-scheduler-alerts"
+  metrics_collection:
+    enabled: true
+    retention_days: 30
+    detailed_logging: true
+
+# Resource Limits
+resource_limits:
+  max_concurrent_executions: 50
+  memory_limit: "1GB"
+  timeout: "540s"
+  cpu_limit: "1000m"
+
+# Development and Testing
+development:
+  test_schedules:
+    test_daily_checkin:
+      name: "fylgja-test-daily-checkin"
+      description: "Test daily check-in functionality"
+      schedule: "*/5 * * * *"  # Every 5 minutes for testing
+      timezone: "UTC"
+      topic: "fylgja-daily-checkins"
+      payload:
+        timezone: "UTC"
+        test_mode: true
+        test_user_count: 5
+  
+  staging_schedules:
+    staging_health_check:
+      name: "fylgja-staging-health-check"
+      description: "Staging environment health check"
+      schedule: "*/30 * * * *" # Every 30 minutes
+      timezone: "UTC"
+      topic: "fylgja-maintenance"
+      payload:
+        maintenanceType: "health_check"
+        environment: "staging"
+
