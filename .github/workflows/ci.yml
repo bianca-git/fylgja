@@ -1,0 +1,236 @@
+name: Fylgja CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+  FIREBASE_PROJECT_ID: fylgja-app
+
+jobs:
+  # Lint and test Cloud Functions
+  functions-test:
+    name: Test Cloud Functions
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: functions/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        cd functions
+        npm ci
+        
+    - name: Run linting
+      run: |
+        cd functions
+        npm run lint
+        
+    - name: Run type checking
+      run: |
+        cd functions
+        npm run build
+        
+    - name: Run tests
+      run: |
+        cd functions
+        npm test
+        
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: functions/coverage/lcov.info
+        flags: functions
+        name: functions-coverage
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Dependency check
+  dependency-check:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Check for vulnerabilities
+      run: |
+        cd functions
+        npm audit --audit-level=high
+        
+    - name: Check for outdated packages
+      run: |
+        cd functions
+        npm outdated || true
+
+  # Build and validate
+  build:
+    name: Build and Validate
+    runs-on: ubuntu-latest
+    needs: [functions-test, security-scan, dependency-check]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: functions/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        cd functions
+        npm ci
+        
+    - name: Build functions
+      run: |
+        cd functions
+        npm run build
+        
+    - name: Validate Firestore rules
+      uses: firebase-tools-action@v1
+      with:
+        args: firestore:rules:validate
+      env:
+        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: functions-build
+        path: functions/lib/
+        retention-days: 7
+
+  # Deploy to development (only on main branch)
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: development
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: functions/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        cd functions
+        npm ci
+        
+    - name: Build functions
+      run: |
+        cd functions
+        npm run build
+        
+    - name: Deploy to Firebase
+      uses: firebase-tools-action@v1
+      with:
+        args: deploy --only functions,firestore:rules,firestore:indexes --project ${{ env.FIREBASE_PROJECT_ID }}
+      env:
+        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "✅ Deployment to development environment successful!"
+        
+    - name: Notify deployment failure
+      if: failure()
+      run: |
+        echo "❌ Deployment to development environment failed!"
+
+  # Performance testing (optional)
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    needs: [deploy-dev]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Install performance testing tools
+      run: |
+        npm install -g artillery
+        
+    - name: Run performance tests
+      run: |
+        # Add performance test scripts here when available
+        echo "Performance tests would run here"
+        
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-results
+        path: performance-results/
+        retention-days: 30
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, performance-test]
+    if: always()
+    
+    steps:
+    - name: Clean up artifacts
+      run: |
+        echo "Cleaning up temporary artifacts..."
+        # Add cleanup commands here if needed
+

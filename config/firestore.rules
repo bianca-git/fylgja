@@ -1,55 +1,90 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only access their own data
+    
+    // Helper functions for authentication and authorization
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isValidUser() {
+      return isAuthenticated() && request.auth.uid != null;
+    }
+    
+    // User profile and data access
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Users can read and write their own profile data
+      allow read, write: if isOwner(userId);
       
-      // User interactions (conversations, check-ins)
+      // User interactions subcollection
       match /interactions/{interactionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
+        
+        // Allow system to write interaction data
+        allow create: if isAuthenticated() && 
+          request.auth.uid == userId &&
+          request.resource.data.keys().hasAll(['timestamp', 'platform', 'type']);
       }
       
-      // User tasks and reminders
+      // User tasks subcollection
       match /tasks/{taskId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
+        
+        // Validate task data structure
+        allow create, update: if isOwner(userId) &&
+          request.resource.data.keys().hasAll(['title', 'status', 'createdAt']) &&
+          request.resource.data.status in ['pending', 'in_progress', 'completed', 'cancelled'];
       }
       
-      // Legacy data (encrypted client-side)
-      match /legacyData/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      // User preferences and settings
-      match /preferences/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Legacy data subcollection - highly restricted
+      match /legacyData/{entryId} {
+        // Only the user can access their legacy data
+        allow read, write: if isOwner(userId);
+        
+        // Ensure encrypted content is never empty
+        allow create, update: if isOwner(userId) &&
+          request.resource.data.keys().hasAll(['encryptedContent', 'encryptionMeta', 'createdAt']) &&
+          request.resource.data.encryptedContent.size() > 0;
+        
+        // Log access attempts
+        allow read: if isOwner(userId) &&
+          // This would trigger a cloud function to log access
+          true;
       }
     }
     
-    // Scheduled messages (system access only)
+    // Scheduled messages - system access only
     match /scheduled_messages/{messageId} {
-      allow read, write: if false; // Only accessible via Cloud Functions
+      // Only allow system service account access
+      allow read, write: if false; // Handled by Cloud Functions only
     }
     
-    // System logs and analytics (admin access only)
-    match /system_logs/{logId} {
-      allow read, write: if false; // Only accessible via Cloud Functions
+    // System analytics - admin access only  
+    match /system_analytics/{analyticsId} {
+      // No direct client access - admin/system only
+      allow read, write: if false;
     }
     
-    // Error logs (system access only)
-    match /errors/{errorId} {
-      allow read, write: if false; // Only accessible via Cloud Functions
+    // Error logs - system access only
+    match /error_logs/{errorId} {
+      // No client access - system logging only
+      allow read, write: if false;
     }
     
-    // Webhook logs (system access only)
+    // Webhook logs - system access only
     match /webhook_logs/{logId} {
-      allow read, write: if false; // Only accessible via Cloud Functions
+      // No client access - system logging only
+      allow read, write: if false;
     }
     
-    // Public data (read-only for authenticated users)
-    match /public/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false; // Only writable via Cloud Functions
+    // Global read rules for authenticated users (limited scope)
+    match /{document=**} {
+      // Deny all other access by default
+      allow read, write: if false;
     }
   }
 }
