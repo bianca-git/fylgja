@@ -4,6 +4,7 @@
  */
 
 import { GoogleAIService } from '../services/google-ai-service';
+import * as crypto from 'crypto';
 import { DatabaseService } from '../services/database-service';
 import { PromptEngine, PromptContext, GeneratedQuestion } from './prompt-engine';
 import { AdaptiveLearningEngine } from './adaptive-learning';
@@ -897,7 +898,8 @@ export class CoreProcessor {
   }
 
   private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const randomBytes = crypto.randomBytes(12).toString('hex'); // 12 bytes = 24 hex characters
+    return `session_${Date.now()}_${randomBytes}`;
   }
 
   /**
