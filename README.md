@@ -19,6 +19,21 @@ Fylgja is an intelligent AI companion that learns from your daily interactions t
 - **Creative**: Inspiration and idea exploration
 - **Analytical**: Pattern recognition and optimization insights
 
+## 🔐 Security & Privacy
+
+**Privacy-First Architecture**: Fylgja implements zero-knowledge encryption and client-side security measures to protect your personal data.
+
+- **End-to-End Encryption**: All personal data encrypted before storage
+- **Firebase Security**: Service account credentials managed through GitHub secrets
+- **Zero-Knowledge Legacy**: Memorial data accessible only to designated recipients
+- **Differential Privacy**: AI learning without compromising individual privacy
+
+📖 **[Read the complete Security Documentation](SECURITY.md)** for detailed information about:
+- Firebase credential management with GitHub secrets
+- Security best practices for CI/CD pipelines
+- Emergency procedures and credential rotation
+- Monitoring and auditing guidelines
+
 ## 🏗️ Architecture
 
 ### Technology Stack
