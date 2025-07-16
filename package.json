@@ -42,8 +42,8 @@
   },
   "homepage": "https://github.com/bianca-git/fylgja#readme",
   "devDependencies": {
-    "firebase-tools": "^13.0.0",
-    "concurrently": "^8.0.0"
+    "firebase-tools": "^14.10.1",
+    "concurrently": "^9.2.0"
   },
   "engines": {
     "node": ">=18.0.0",
