@@ -3,8 +3,8 @@
  * Optimizes database queries for maximum performance with Firestore
  */
 
-import { performanceMonitor } from '../utils/monitoring';
 import { FylgjaError, createSystemError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
 
 export interface QueryPlan {
   collection: string;
@@ -21,7 +21,17 @@ export interface QueryPlan {
 
 export interface QueryFilter {
   field: string;
-  operator: '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in' | 'not-in' | 'array-contains' | 'array-contains-any';
+  operator:
+    | '=='
+    | '!='
+    | '<'
+    | '<='
+    | '>'
+    | '>='
+    | 'in'
+    | 'not-in'
+    | 'array-contains'
+    | 'array-contains-any';
   value: any;
   selectivity: number; // 0-1, how selective this filter is
 }
@@ -61,7 +71,7 @@ export class QueryOptimizer {
   private queryStats: Map<string, QueryStats[]> = new Map();
   private indexUsageStats: Map<string, number> = new Map();
   private slowQueries: QueryStats[] = [];
-  
+
   private readonly SLOW_QUERY_THRESHOLD = 1000; // 1 second
   private readonly MAX_STATS_HISTORY = 1000;
   private readonly SELECTIVITY_CACHE = new Map<string, number>();
@@ -84,21 +94,34 @@ export class QueryOptimizer {
     try {
       // Analyze and optimize filters
       const optimizedFilters = this.optimizeFilters(collection, filters);
-      
+
       // Determine optimal ordering
       const optimizedOrderBy = this.optimizeOrderBy(collection, options.orderBy, optimizedFilters);
-      
+
       // Calculate estimated cost
-      const estimatedCost = this.calculateQueryCost(collection, optimizedFilters, optimizedOrderBy, options.limit);
-      
+      const estimatedCost = this.calculateQueryCost(
+        collection,
+        optimizedFilters,
+        optimizedOrderBy,
+        options.limit
+      );
+
       // Recommend indexes
-      const recommendedIndexes = this.recommendIndexes(collection, optimizedFilters, optimizedOrderBy);
-      
+      const recommendedIndexes = this.recommendIndexes(
+        collection,
+        optimizedFilters,
+        optimizedOrderBy
+      );
+
       // Generate optimizations
       const optimizations = this.generateOptimizations(collection, optimizedFilters, options);
-      
+
       // Determine cache strategy
-      const cacheStrategy = this.determineCacheStrategy(collection, optimizedFilters, estimatedCost);
+      const cacheStrategy = this.determineCacheStrategy(
+        collection,
+        optimizedFilters,
+        estimatedCost
+      );
 
       const queryPlan: QueryPlan = {
         collection,
@@ -115,7 +138,6 @@ export class QueryOptimizer {
 
       performanceMonitor.endTimer(timerId);
       return queryPlan;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Query optimization failed: ${error.message}`);
@@ -144,7 +166,7 @@ export class QueryOptimizer {
    */
   private calculateSelectivity(collection: string, filter: QueryFilter): number {
     const cacheKey = `${collection}_${filter.field}_${filter.operator}`;
-    
+
     // Check cache first
     if (this.SELECTIVITY_CACHE.has(cacheKey)) {
       return this.SELECTIVITY_CACHE.get(cacheKey)!;
@@ -164,7 +186,12 @@ export class QueryOptimizer {
       case '<=':
       case '>':
       case '>=':
-        selectivity = this.estimateRangeSelectivity(collection, filter.field, filter.operator, filter.value);
+        selectivity = this.estimateRangeSelectivity(
+          collection,
+          filter.field,
+          filter.operator,
+          filter.value
+        );
         break;
       case 'in':
         selectivity = this.estimateInSelectivity(collection, filter.field, filter.value);
@@ -188,13 +215,17 @@ export class QueryOptimizer {
 
     for (const filter of filters) {
       // Combine range filters on the same field
-      if ((filter.operator === '<' || filter.operator === '<=' || 
-           filter.operator === '>' || filter.operator === '>=') &&
-          !processedFields.has(filter.field)) {
-        
-        const rangeFilters = filters.filter(f => 
-          f.field === filter.field && 
-          (f.operator === '<' || f.operator === '<=' || f.operator === '>' || f.operator === '>=')
+      if (
+        (filter.operator === '<' ||
+          filter.operator === '<=' ||
+          filter.operator === '>' ||
+          filter.operator === '>=') &&
+        !processedFields.has(filter.field)
+      ) {
+        const rangeFilters = filters.filter(
+          f =>
+            f.field === filter.field &&
+            (f.operator === '<' || f.operator === '<=' || f.operator === '>' || f.operator === '>=')
         );
 
         if (rangeFilters.length > 1) {
@@ -323,7 +354,7 @@ export class QueryOptimizer {
     if (filters.length > 0 && orderBy.length > 0) {
       const primaryFilter = filters[0];
       const primaryOrder = orderBy[0];
-      
+
       if (primaryFilter.field !== primaryOrder.field) {
         indexes.push(`${collection}_by_${primaryFilter.field}_${primaryOrder.field}`);
       }
@@ -350,20 +381,29 @@ export class QueryOptimizer {
     // Suggest more selective filters
     const lowSelectivityFilters = filters.filter(f => f.selectivity > 0.8);
     if (lowSelectivityFilters.length > 0) {
-      optimizations.push(`Consider adding more selective filters for fields: ${lowSelectivityFilters.map(f => f.field).join(', ')}`);
+      optimizations.push(
+        `Consider adding more selective filters for fields: ${lowSelectivityFilters.map(f => f.field).join(', ')}`
+      );
     }
 
     // Suggest avoiding inequality filters on multiple fields
     const inequalityFields = filters
       .filter(f => ['<', '<=', '>', '>=', '!='].includes(f.operator))
       .map(f => f.field);
-    
+
     if (new Set(inequalityFields).size > 1) {
-      optimizations.push('Avoid inequality filters on multiple fields - consider restructuring query');
+      optimizations.push(
+        'Avoid inequality filters on multiple fields - consider restructuring query'
+      );
     }
 
     // Suggest caching for expensive queries
-    const estimatedCost = this.calculateQueryCost(collection, filters, options.orderBy, options.limit);
+    const estimatedCost = this.calculateQueryCost(
+      collection,
+      filters,
+      options.orderBy,
+      options.limit
+    );
     if (estimatedCost > 5) {
       optimizations.push('Consider caching results for this expensive query');
     }
@@ -380,7 +420,7 @@ export class QueryOptimizer {
     estimatedCost: number
   ): CacheStrategy {
     const shouldCache = estimatedCost > 3 || filters.some(f => f.selectivity > 0.7);
-    
+
     if (!shouldCache) {
       return {
         enabled: false,
@@ -394,12 +434,12 @@ export class QueryOptimizer {
     const filterKey = filters
       .map(f => `${f.field}_${f.operator}_${JSON.stringify(f.value)}`)
       .join('_');
-    
+
     const cacheKey = `query_${collection}_${filterKey}`;
 
     // Determine TTL based on data volatility
     let ttl = 300000; // 5 minutes default
-    
+
     if (collection === 'user_profiles') {
       ttl = 1800000; // 30 minutes for user profiles
     } else if (collection === 'interactions') {
@@ -457,7 +497,7 @@ export class QueryOptimizer {
     // Track slow queries
     if (executionTime > this.SLOW_QUERY_THRESHOLD) {
       this.slowQueries.push(stats);
-      
+
       // Limit slow query history
       if (this.slowQueries.length > 100) {
         this.slowQueries.shift();
@@ -472,9 +512,9 @@ export class QueryOptimizer {
     const suggestions: OptimizationSuggestion[] = [];
 
     // Analyze slow queries
-    const relevantSlowQueries = collection ? 
-      this.slowQueries.filter(q => q.collection === collection) : 
-      this.slowQueries;
+    const relevantSlowQueries = collection
+      ? this.slowQueries.filter(q => q.collection === collection)
+      : this.slowQueries;
 
     if (relevantSlowQueries.length > 0) {
       suggestions.push({
@@ -524,15 +564,19 @@ export class QueryOptimizer {
     mostUsedIndexes: Array<{ index: string; usage: number }>;
     queryDistribution: Record<string, number>;
   } {
-    const relevantStats = collection ? 
-      (this.queryStats.get(collection) || []) : 
-      Array.from(this.queryStats.values()).flat();
+    const relevantStats = collection
+      ? this.queryStats.get(collection) || []
+      : Array.from(this.queryStats.values()).flat();
 
     const totalQueries = relevantStats.length;
-    const averageExecutionTime = totalQueries > 0 ? 
-      relevantStats.reduce((sum, s) => sum + s.executionTime, 0) / totalQueries : 0;
+    const averageExecutionTime =
+      totalQueries > 0
+        ? relevantStats.reduce((sum, s) => sum + s.executionTime, 0) / totalQueries
+        : 0;
 
-    const slowQueryCount = relevantStats.filter(s => s.executionTime > this.SLOW_QUERY_THRESHOLD).length;
+    const slowQueryCount = relevantStats.filter(
+      s => s.executionTime > this.SLOW_QUERY_THRESHOLD
+    ).length;
     const cacheHits = relevantStats.filter(s => s.cacheHit).length;
     const cacheHitRate = totalQueries > 0 ? cacheHits / totalQueries : 0;
 
@@ -563,7 +607,7 @@ export class QueryOptimizer {
     if (filters.length === 1 && filters[0].operator === '==' && filters[0].field === 'id') {
       return 'get';
     }
-    
+
     if (options.count) {
       return 'count';
     }
@@ -580,7 +624,12 @@ export class QueryOptimizer {
     return 0.5; // Default
   }
 
-  private estimateRangeSelectivity(collection: string, field: string, operator: string, value: any): number {
+  private estimateRangeSelectivity(
+    collection: string,
+    field: string,
+    operator: string,
+    value: any
+  ): number {
     // Estimate based on operator and field type
     if (field.includes('timestamp') || field.includes('date')) {
       return 0.3; // Time ranges are usually selective
@@ -618,7 +667,7 @@ export class QueryOptimizer {
   }
 
   private calculateActualCost(executionTime: number, documentsRead: number): number {
-    return (executionTime / 1000) + (documentsRead * 0.1);
+    return executionTime / 1000 + documentsRead * 0.1;
   }
 
   private findUnusedIndexes(collection?: string): string[] {
@@ -638,11 +687,13 @@ export class QueryOptimizer {
   }
 
   private analyzeCacheMisses(collection?: string): number {
-    const relevantStats = collection ? 
-      (this.queryStats.get(collection) || []) : 
-      Array.from(this.queryStats.values()).flat();
+    const relevantStats = collection
+      ? this.queryStats.get(collection) || []
+      : Array.from(this.queryStats.values()).flat();
 
-    if (relevantStats.length === 0) return 0;
+    if (relevantStats.length === 0) {
+      return 0;
+    }
 
     const misses = relevantStats.filter(s => !s.cacheHit).length;
     return misses / relevantStats.length;
@@ -651,4 +702,3 @@ export class QueryOptimizer {
 
 // Global query optimizer instance
 export const queryOptimizer = new QueryOptimizer();
-

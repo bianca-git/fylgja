@@ -3,10 +3,11 @@
  * Provides pre-built templates and AI-powered suggestions for common reminders
  */
 
-import { ReminderTemplate, SmartSuggestion, Reminder, RecurrencePattern } from './reminder-system';
 import { EnhancedDatabaseService } from '../services/enhanced-database-service';
 import { GoogleAIService } from '../services/google-ai-service';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
+
+import { ReminderTemplate, SmartSuggestion, Reminder, RecurrencePattern } from './reminder-system';
 
 export interface TemplateCategory {
   id: string;
@@ -60,19 +61,21 @@ export class ReminderTemplateManager {
       const userTemplates = await this.databaseService.getUserTemplates();
 
       // Organize into categories
-      const categories = this.organizeTemplatesIntoCategories([...systemTemplates, ...userTemplates]);
+      const categories = this.organizeTemplatesIntoCategories([
+        ...systemTemplates,
+        ...userTemplates,
+      ]);
 
       console.log('Retrieved template categories', { count: categories.length });
 
       return categories;
-
     } catch (error) {
       console.error('Failed to get template categories', { error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to get template categories',
-        context: { error: error.message }
+        context: { error: error.message },
       });
     }
   }
@@ -95,15 +98,24 @@ export class ReminderTemplateManager {
       const personalizedTemplates: PersonalizedTemplate[] = [];
 
       for (const template of allTemplates) {
-        const personalizationScore = this.calculatePersonalizationScore(template, userPatterns, userProfile);
-        
-        if (personalizationScore > 0.3) { // Only include relevant templates
-          const customizations = await this.generateTemplateCustomizations(template, userPatterns, userProfile);
-          
+        const personalizationScore = this.calculatePersonalizationScore(
+          template,
+          userPatterns,
+          userProfile
+        );
+
+        if (personalizationScore > 0.3) {
+          // Only include relevant templates
+          const customizations = await this.generateTemplateCustomizations(
+            template,
+            userPatterns,
+            userProfile
+          );
+
           personalizedTemplates.push({
             template,
             personalizationScore,
-            customizations
+            customizations,
           });
         }
       }
@@ -113,21 +125,20 @@ export class ReminderTemplateManager {
 
       console.log('Generated personalized templates', {
         userId,
-        count: personalizedTemplates.length
+        count: personalizedTemplates.length,
       });
 
       return personalizedTemplates.slice(0, 10); // Return top 10
-
     } catch (error) {
       console.error('Failed to get personalized templates', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to get personalized templates',
-        context: { userId, error: error.message }
+        context: { userId, error: error.message },
       });
     }
   }
@@ -140,13 +151,13 @@ export class ReminderTemplateManager {
     reminder: Reminder,
     templateName: string,
     templateDescription: string,
-    makePublic: boolean = false
+    makePublic = false
   ): Promise<ReminderTemplate> {
     try {
       console.log('Creating template from reminder', {
         userId,
         reminderId: reminder.id,
-        templateName
+        templateName,
       });
 
       const template: ReminderTemplate = {
@@ -162,12 +173,12 @@ export class ReminderTemplateManager {
         customFields: {
           originalReminderId: reminder.id,
           tags: reminder.tags,
-          tone: reminder.delivery.tone
+          tone: reminder.delivery.tone,
         },
         isSystemTemplate: false,
         createdBy: userId,
         usageCount: 0,
-        rating: 0
+        rating: 0,
       };
 
       // Store template
@@ -175,22 +186,21 @@ export class ReminderTemplateManager {
 
       console.log('Template created successfully', {
         templateId: template.id,
-        templateName
+        templateName,
       });
 
       return template;
-
     } catch (error) {
       console.error('Failed to create template from reminder', {
         userId,
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to create template from reminder',
-        context: { userId, reminderId: reminder.id, error: error.message }
+        context: { userId, reminderId: reminder.id, error: error.message },
       });
     }
   }
@@ -209,37 +219,36 @@ export class ReminderTemplateManager {
       const suggestions: SmartSuggestion[] = [];
 
       // Pattern-based suggestions
-      suggestions.push(...await this.generatePatternBasedSuggestions(userId, patterns));
+      suggestions.push(...(await this.generatePatternBasedSuggestions(userId, patterns)));
 
       // Goal-based suggestions
-      suggestions.push(...await this.generateGoalBasedSuggestions(userId));
+      suggestions.push(...(await this.generateGoalBasedSuggestions(userId)));
 
       // Time-based suggestions
-      suggestions.push(...await this.generateTimeBasedSuggestions(userId, patterns));
+      suggestions.push(...(await this.generateTimeBasedSuggestions(userId, patterns)));
 
       // AI-powered suggestions
-      suggestions.push(...await this.generateAIPoweredSuggestions(userId, patterns));
+      suggestions.push(...(await this.generateAIPoweredSuggestions(userId, patterns)));
 
       // Filter and rank suggestions
       const rankedSuggestions = this.rankSuggestions(suggestions, patterns);
 
       console.log('Generated smart suggestions', {
         userId,
-        count: rankedSuggestions.length
+        count: rankedSuggestions.length,
       });
 
       return rankedSuggestions.slice(0, 5); // Return top 5
-
     } catch (error) {
       console.error('Failed to generate smart suggestions', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to generate smart suggestions',
-        context: { userId, error: error.message }
+        context: { userId, error: error.message },
       });
     }
   }
@@ -256,16 +265,17 @@ export class ReminderTemplateManager {
         description: 'Never miss your medication with timely reminders',
         category: 'health',
         defaultTitle: 'Take your medication',
-        defaultDescription: 'Time to take your prescribed medication. Remember to take it with food if required.',
+        defaultDescription:
+          'Time to take your prescribed medication. Remember to take it with food if required.',
         defaultPriority: 'high',
         suggestedRecurrence: { type: 'daily', interval: 1 },
         suggestedAdvanceNotifications: [
-          { timeBeforeReminder: 5, message: 'Medication reminder in 5 minutes' }
+          { timeBeforeReminder: 5, message: 'Medication reminder in 5 minutes' },
         ],
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.8
+        rating: 4.8,
       },
       {
         id: 'health-water',
@@ -280,7 +290,7 @@ export class ReminderTemplateManager {
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.5
+        rating: 4.5,
       },
       {
         id: 'health-exercise',
@@ -292,12 +302,12 @@ export class ReminderTemplateManager {
         defaultPriority: 'medium',
         suggestedRecurrence: { type: 'daily', interval: 1 },
         suggestedAdvanceNotifications: [
-          { timeBeforeReminder: 15, message: 'Exercise time in 15 minutes - get ready!' }
+          { timeBeforeReminder: 15, message: 'Exercise time in 15 minutes - get ready!' },
         ],
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.6
+        rating: 4.6,
       },
 
       // Work & Productivity Templates
@@ -312,12 +322,12 @@ export class ReminderTemplateManager {
         suggestedRecurrence: undefined,
         suggestedAdvanceNotifications: [
           { timeBeforeReminder: 15, message: 'Meeting in 15 minutes' },
-          { timeBeforeReminder: 5, message: 'Meeting starting in 5 minutes' }
+          { timeBeforeReminder: 5, message: 'Meeting starting in 5 minutes' },
         ],
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.9
+        rating: 4.9,
       },
       {
         id: 'work-break',
@@ -332,7 +342,7 @@ export class ReminderTemplateManager {
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.3
+        rating: 4.3,
       },
       {
         id: 'work-deadline',
@@ -340,17 +350,18 @@ export class ReminderTemplateManager {
         description: 'Stay on top of important deadlines',
         category: 'work',
         defaultTitle: 'Project deadline approaching',
-        defaultDescription: 'Your project deadline is coming up. Review your progress and plan accordingly.',
+        defaultDescription:
+          'Your project deadline is coming up. Review your progress and plan accordingly.',
         defaultPriority: 'urgent',
         suggestedRecurrence: undefined,
         suggestedAdvanceNotifications: [
           { timeBeforeReminder: 1440, message: 'Deadline tomorrow!' }, // 24 hours
-          { timeBeforeReminder: 240, message: 'Deadline in 4 hours' } // 4 hours
+          { timeBeforeReminder: 240, message: 'Deadline in 4 hours' }, // 4 hours
         ],
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.7
+        rating: 4.7,
       },
 
       // Personal & Lifestyle Templates
@@ -360,14 +371,15 @@ export class ReminderTemplateManager {
         description: 'Stay connected with loved ones',
         category: 'social',
         defaultTitle: 'Call family/friends',
-        defaultDescription: 'Reach out to someone you care about. A quick call can brighten their day!',
+        defaultDescription:
+          'Reach out to someone you care about. A quick call can brighten their day!',
         defaultPriority: 'medium',
         suggestedRecurrence: { type: 'weekly', interval: 1 },
         suggestedAdvanceNotifications: [],
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.4
+        rating: 4.4,
       },
       {
         id: 'personal-gratitude',
@@ -375,14 +387,14 @@ export class ReminderTemplateManager {
         description: 'Daily gratitude reflection',
         category: 'personal',
         defaultTitle: 'Gratitude moment',
-        defaultDescription: 'Take a moment to reflect on three things you\'re grateful for today.',
+        defaultDescription: "Take a moment to reflect on three things you're grateful for today.",
         defaultPriority: 'low',
         suggestedRecurrence: { type: 'daily', interval: 1 },
         suggestedAdvanceNotifications: [],
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.6
+        rating: 4.6,
       },
       {
         id: 'personal-journal',
@@ -397,7 +409,7 @@ export class ReminderTemplateManager {
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.5
+        rating: 4.5,
       },
 
       // Learning & Development Templates
@@ -407,16 +419,17 @@ export class ReminderTemplateManager {
         description: 'Dedicated time for learning',
         category: 'learning',
         defaultTitle: 'Study time',
-        defaultDescription: 'Time for focused learning. Review your materials and practice what you\'ve learned.',
+        defaultDescription:
+          "Time for focused learning. Review your materials and practice what you've learned.",
         defaultPriority: 'medium',
         suggestedRecurrence: { type: 'daily', interval: 1 },
         suggestedAdvanceNotifications: [
-          { timeBeforeReminder: 10, message: 'Study session starting in 10 minutes' }
+          { timeBeforeReminder: 10, message: 'Study session starting in 10 minutes' },
         ],
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.4
+        rating: 4.4,
       },
       {
         id: 'learning-reading',
@@ -424,15 +437,16 @@ export class ReminderTemplateManager {
         description: 'Daily reading habit',
         category: 'learning',
         defaultTitle: 'Reading time',
-        defaultDescription: 'Spend some time reading. Even 15 minutes a day can make a big difference!',
+        defaultDescription:
+          'Spend some time reading. Even 15 minutes a day can make a big difference!',
         defaultPriority: 'medium',
         suggestedRecurrence: { type: 'daily', interval: 1 },
         suggestedAdvanceNotifications: [],
         isSystemTemplate: true,
         createdBy: 'system',
         usageCount: 0,
-        rating: 4.3
-      }
+        rating: 4.3,
+      },
     ];
   }
 
@@ -447,18 +461,38 @@ export class ReminderTemplateManager {
 
     // Define category metadata
     const categoryInfo = {
-      health: { name: 'Health & Wellness', description: 'Take care of your physical and mental health', icon: '🏥' },
-      work: { name: 'Work & Productivity', description: 'Stay productive and manage work tasks', icon: '💼' },
-      personal: { name: 'Personal Development', description: 'Focus on personal growth and habits', icon: '👤' },
-      social: { name: 'Social & Relationships', description: 'Maintain connections with others', icon: '👥' },
-      learning: { name: 'Learning & Education', description: 'Continuous learning and skill development', icon: '📚' },
-      custom: { name: 'Custom', description: 'Your personalized reminder templates', icon: '📌' }
+      health: {
+        name: 'Health & Wellness',
+        description: 'Take care of your physical and mental health',
+        icon: '🏥',
+      },
+      work: {
+        name: 'Work & Productivity',
+        description: 'Stay productive and manage work tasks',
+        icon: '💼',
+      },
+      personal: {
+        name: 'Personal Development',
+        description: 'Focus on personal growth and habits',
+        icon: '👤',
+      },
+      social: {
+        name: 'Social & Relationships',
+        description: 'Maintain connections with others',
+        icon: '👥',
+      },
+      learning: {
+        name: 'Learning & Education',
+        description: 'Continuous learning and skill development',
+        icon: '📚',
+      },
+      custom: { name: 'Custom', description: 'Your personalized reminder templates', icon: '📌' },
     };
 
     // Group templates by category
     for (const template of templates) {
       const categoryId = template.category;
-      
+
       if (!categoryMap.has(categoryId)) {
         const info = categoryInfo[categoryId] || categoryInfo.custom;
         categoryMap.set(categoryId, {
@@ -467,7 +501,7 @@ export class ReminderTemplateManager {
           description: info.description,
           icon: info.icon,
           templates: [],
-          popularity: 0
+          popularity: 0,
         });
       }
 
@@ -515,7 +549,10 @@ export class ReminderTemplateManager {
     }
 
     // Recurrence preference
-    if (template.suggestedRecurrence && userPatterns.preferredRecurrence?.[template.suggestedRecurrence.type]) {
+    if (
+      template.suggestedRecurrence &&
+      userPatterns.preferredRecurrence?.[template.suggestedRecurrence.type]
+    ) {
       score += 0.1;
     }
 
@@ -543,8 +580,8 @@ export class ReminderTemplateManager {
         prompt: customizationPrompt,
         context: {
           type: 'template_personalization',
-          templateId: template.id
-        }
+          templateId: template.id,
+        },
       });
 
       // Parse AI suggestions (simplified)
@@ -553,9 +590,8 @@ export class ReminderTemplateManager {
         suggestedDescription: template.defaultDescription,
         suggestedTime: this.suggestOptimalTime(userPatterns),
         suggestedRecurrence: template.suggestedRecurrence,
-        reasoning: aiResponse.response
+        reasoning: aiResponse.response,
       };
-
     } catch (error) {
       // Fallback to pattern-based customizations
       return {
@@ -563,7 +599,7 @@ export class ReminderTemplateManager {
         suggestedDescription: template.defaultDescription,
         suggestedTime: this.suggestOptimalTime(userPatterns),
         suggestedRecurrence: template.suggestedRecurrence,
-        reasoning: 'Based on your usage patterns'
+        reasoning: 'Based on your usage patterns',
       };
     }
   }
@@ -571,13 +607,13 @@ export class ReminderTemplateManager {
   private suggestOptimalTime(userPatterns: any): Date {
     // Find user's most active hour
     const preferredTimes = userPatterns.preferredTimes || {};
-    const mostActiveHour = Object.keys(preferredTimes).reduce((a, b) => 
+    const mostActiveHour = Object.keys(preferredTimes).reduce((a, b) =>
       preferredTimes[a] > preferredTimes[b] ? a : b
     );
 
     const suggestedTime = new Date();
     suggestedTime.setHours(parseInt(mostActiveHour) || 9, 0, 0, 0);
-    
+
     // If the time has passed today, suggest tomorrow
     if (suggestedTime <= new Date()) {
       suggestedTime.setDate(suggestedTime.getDate() + 1);
@@ -596,9 +632,8 @@ export class ReminderTemplateManager {
         patterns,
         recentReminders,
         goals,
-        insights: this.generatePatternInsights(patterns, recentReminders)
+        insights: this.generatePatternInsights(patterns, recentReminders),
       };
-
     } catch (error) {
       console.warn('Failed to analyze user patterns', { userId, error: error.message });
       return { patterns: {}, recentReminders: [], goals: [], insights: [] };
@@ -625,7 +660,7 @@ export class ReminderTemplateManager {
       return acc;
     }, {});
 
-    const bestHour = Object.keys(hourCounts).reduce((a, b) => 
+    const bestHour = Object.keys(hourCounts).reduce((a, b) =>
       hourCounts[a] > hourCounts[b] ? a : b
     );
 
@@ -636,12 +671,15 @@ export class ReminderTemplateManager {
     return insights;
   }
 
-  private async generatePatternBasedSuggestions(userId: string, patterns: any): Promise<SmartSuggestion[]> {
+  private async generatePatternBasedSuggestions(
+    userId: string,
+    patterns: any
+  ): Promise<SmartSuggestion[]> {
     const suggestions: SmartSuggestion[] = [];
 
     // Suggest based on successful patterns
     if (patterns.patterns.preferredCategories) {
-      const topCategory = Object.keys(patterns.patterns.preferredCategories).reduce((a, b) => 
+      const topCategory = Object.keys(patterns.patterns.preferredCategories).reduce((a, b) =>
         patterns.patterns.preferredCategories[a] > patterns.patterns.preferredCategories[b] ? a : b
       );
 
@@ -656,17 +694,17 @@ export class ReminderTemplateManager {
           reasoning: `Based on your high engagement with ${topCategory} reminders`,
           suggestedReminder: {
             category: topCategory as any,
-            priority: 'medium'
-          }
+            priority: 'medium',
+          },
         },
         basedOn: {
           patterns: ['category_preference'],
           data: patterns.patterns.preferredCategories,
-          timeframe: 'last_30_days'
+          timeframe: 'last_30_days',
         },
         status: 'pending',
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
     }
 
@@ -678,8 +716,9 @@ export class ReminderTemplateManager {
 
     try {
       const goals = await this.databaseService.getUserGoals(userId);
-      
-      for (const goal of goals.slice(0, 3)) { // Top 3 goals
+
+      for (const goal of goals.slice(0, 3)) {
+        // Top 3 goals
         if (goal.status === 'in_progress') {
           suggestions.push({
             id: `goal-${userId}-${goal.id}`,
@@ -687,29 +726,28 @@ export class ReminderTemplateManager {
             type: 'reminder',
             suggestion: {
               title: `Progress check: ${goal.title}`,
-              description: `Set a reminder to check your progress on this goal`,
+              description: 'Set a reminder to check your progress on this goal',
               confidence: 0.8,
-              reasoning: `You have an active goal that could benefit from regular check-ins`,
+              reasoning: 'You have an active goal that could benefit from regular check-ins',
               suggestedReminder: {
                 title: `Check progress: ${goal.title}`,
                 description: `Review your progress and plan next steps for: ${goal.title}`,
                 category: 'personal',
                 priority: 'medium',
-                recurrence: { type: 'weekly', interval: 1 }
-              }
+                recurrence: { type: 'weekly', interval: 1 },
+              },
             },
             basedOn: {
               patterns: ['active_goals'],
               data: { goalId: goal.id, goalTitle: goal.title },
-              timeframe: 'current'
+              timeframe: 'current',
             },
             status: 'pending',
             createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           });
         }
       }
-
     } catch (error) {
       console.warn('Failed to generate goal-based suggestions', { userId, error: error.message });
     }
@@ -717,7 +755,10 @@ export class ReminderTemplateManager {
     return suggestions;
   }
 
-  private async generateTimeBasedSuggestions(userId: string, patterns: any): Promise<SmartSuggestion[]> {
+  private async generateTimeBasedSuggestions(
+    userId: string,
+    patterns: any
+  ): Promise<SmartSuggestion[]> {
     const suggestions: SmartSuggestion[] = [];
 
     // Suggest optimal timing improvements
@@ -732,24 +773,27 @@ export class ReminderTemplateManager {
           confidence: 0.6,
           reasoning: 'Low completion rates often indicate suboptimal timing',
           suggestedChanges: {
-            timing: 'Consider scheduling reminders during your most active hours'
-          }
+            timing: 'Consider scheduling reminders during your most active hours',
+          },
         },
         basedOn: {
           patterns: ['completion_rate'],
           data: patterns.patterns,
-          timeframe: 'last_30_days'
+          timeframe: 'last_30_days',
         },
         status: 'pending',
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
     }
 
     return suggestions;
   }
 
-  private async generateAIPoweredSuggestions(userId: string, patterns: any): Promise<SmartSuggestion[]> {
+  private async generateAIPoweredSuggestions(
+    userId: string,
+    patterns: any
+  ): Promise<SmartSuggestion[]> {
     try {
       const suggestionPrompt = `Based on user reminder patterns, suggest helpful new reminders:
       Patterns: ${JSON.stringify(patterns.insights)}
@@ -762,37 +806,38 @@ export class ReminderTemplateManager {
         prompt: suggestionPrompt,
         context: {
           userId,
-          type: 'ai_reminder_suggestions'
-        }
+          type: 'ai_reminder_suggestions',
+        },
       });
 
       // Parse AI suggestions (simplified)
-      return [{
-        id: `ai-${userId}-${Date.now()}`,
-        userId,
-        type: 'reminder',
-        suggestion: {
-          title: 'AI-suggested reminder',
-          description: 'Based on your patterns, this reminder could be helpful',
-          confidence: aiResponse.confidence || 0.7,
-          reasoning: aiResponse.response,
-          suggestedReminder: {
-            title: 'Daily reflection',
-            description: 'Take 5 minutes to reflect on your day',
-            category: 'personal',
-            priority: 'medium'
-          }
+      return [
+        {
+          id: `ai-${userId}-${Date.now()}`,
+          userId,
+          type: 'reminder',
+          suggestion: {
+            title: 'AI-suggested reminder',
+            description: 'Based on your patterns, this reminder could be helpful',
+            confidence: aiResponse.confidence || 0.7,
+            reasoning: aiResponse.response,
+            suggestedReminder: {
+              title: 'Daily reflection',
+              description: 'Take 5 minutes to reflect on your day',
+              category: 'personal',
+              priority: 'medium',
+            },
+          },
+          basedOn: {
+            patterns: ['ai_analysis'],
+            data: patterns,
+            timeframe: 'comprehensive',
+          },
+          status: 'pending',
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         },
-        basedOn: {
-          patterns: ['ai_analysis'],
-          data: patterns,
-          timeframe: 'comprehensive'
-        },
-        status: 'pending',
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      }];
-
+      ];
     } catch (error) {
       console.warn('Failed to generate AI-powered suggestions', { userId, error: error.message });
       return [];
@@ -808,4 +853,3 @@ export class ReminderTemplateManager {
     });
   }
 }
-

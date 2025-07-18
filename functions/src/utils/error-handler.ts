@@ -74,7 +74,7 @@ export class FylgjaError extends Error {
 
   constructor(details: Partial<ErrorDetails> & { message: string }) {
     super(details.message);
-    
+
     this.name = 'FylgjaError';
     this.type = details.type || ErrorType.UNKNOWN;
     this.severity = details.severity || ErrorSeverity.MEDIUM;
@@ -108,7 +108,7 @@ export class FylgjaError extends Error {
       case ErrorType.AUTHENTICATION:
         return 'Please log in to continue.';
       case ErrorType.AUTHORIZATION:
-        return 'You don\'t have permission to perform this action.';
+        return "You don't have permission to perform this action.";
       case ErrorType.RATE_LIMIT:
         return 'Too many requests. Please wait a moment before trying again.';
       case ErrorType.QUOTA_EXCEEDED:
@@ -169,7 +169,10 @@ export class ErrorHandler {
   /**
    * Handle and process errors
    */
-  public async handleError(error: Error | FylgjaError, context?: Partial<ErrorContext>): Promise<FylgjaError> {
+  public async handleError(
+    error: Error | FylgjaError,
+    context?: Partial<ErrorContext>
+  ): Promise<FylgjaError> {
     let fylgjaError: FylgjaError;
 
     if (error instanceof FylgjaError) {
@@ -425,7 +428,10 @@ export class ErrorHandler {
  * Utility functions for error handling
  */
 
-export function createValidationError(message: string, context?: Partial<ErrorContext>): FylgjaError {
+export function createValidationError(
+  message: string,
+  context?: Partial<ErrorContext>
+): FylgjaError {
   return new FylgjaError({
     type: ErrorType.VALIDATION,
     severity: ErrorSeverity.LOW,
@@ -438,7 +444,10 @@ export function createValidationError(message: string, context?: Partial<ErrorCo
   });
 }
 
-export function createAuthenticationError(message: string, context?: Partial<ErrorContext>): FylgjaError {
+export function createAuthenticationError(
+  message: string,
+  context?: Partial<ErrorContext>
+): FylgjaError {
   return new FylgjaError({
     type: ErrorType.AUTHENTICATION,
     severity: ErrorSeverity.MEDIUM,
@@ -451,7 +460,10 @@ export function createAuthenticationError(message: string, context?: Partial<Err
   });
 }
 
-export function createRateLimitError(retryAfter: number, context?: Partial<ErrorContext>): FylgjaError {
+export function createRateLimitError(
+  retryAfter: number,
+  context?: Partial<ErrorContext>
+): FylgjaError {
   return new FylgjaError({
     type: ErrorType.RATE_LIMIT,
     severity: ErrorSeverity.LOW,
@@ -465,7 +477,10 @@ export function createRateLimitError(retryAfter: number, context?: Partial<Error
   });
 }
 
-export function createServiceUnavailableError(message: string, context?: Partial<ErrorContext>): FylgjaError {
+export function createServiceUnavailableError(
+  message: string,
+  context?: Partial<ErrorContext>
+): FylgjaError {
   return new FylgjaError({
     type: ErrorType.SERVICE_UNAVAILABLE,
     severity: ErrorSeverity.HIGH,
@@ -479,7 +494,10 @@ export function createServiceUnavailableError(message: string, context?: Partial
   });
 }
 
-export function createAIServiceError(message: string, context?: Partial<ErrorContext>): FylgjaError {
+export function createAIServiceError(
+  message: string,
+  context?: Partial<ErrorContext>
+): FylgjaError {
   return new FylgjaError({
     type: ErrorType.AI_SERVICE,
     severity: ErrorSeverity.HIGH,
@@ -498,29 +516,32 @@ export function createAIServiceError(message: string, context?: Partial<ErrorCon
  */
 export function errorMiddleware(error: Error, req: any, res: any, next: any): void {
   const errorHandler = new ErrorHandler();
-  
-  errorHandler.handleError(error, {
-    requestId: req.id,
-    userId: req.user?.uid,
-    endpoint: req.path,
-    userAgent: req.get('User-Agent'),
-    ip: req.ip,
-  }).then((fylgjaError) => {
-    res.status(getHttpStatusCode(fylgjaError.type)).json(fylgjaError.toResponse());
-  }).catch((handlingError) => {
-    console.error('Error in error handler:', handlingError);
-    res.status(500).json({
-      success: false,
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: 'An unexpected error occurred',
-        type: 'unknown',
-        retryable: false,
-      },
-      requestId: req.id || 'unknown',
-      timestamp: new Date().toISOString(),
+
+  errorHandler
+    .handleError(error, {
+      requestId: req.id,
+      userId: req.user?.uid,
+      endpoint: req.path,
+      userAgent: req.get('User-Agent'),
+      ip: req.ip,
+    })
+    .then(fylgjaError => {
+      res.status(getHttpStatusCode(fylgjaError.type)).json(fylgjaError.toResponse());
+    })
+    .catch(handlingError => {
+      console.error('Error in error handler:', handlingError);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected error occurred',
+          type: 'unknown',
+          retryable: false,
+        },
+        requestId: req.id || 'unknown',
+        timestamp: new Date().toISOString(),
+      });
     });
-  });
 }
 
 /**
@@ -556,9 +577,9 @@ function getHttpStatusCode(errorType: ErrorType): number {
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000,
-  maxDelay: number = 10000
+  maxRetries = 3,
+  baseDelay = 1000,
+  maxDelay = 10000
 ): Promise<T> {
   let lastError: Error;
 
@@ -588,4 +609,3 @@ export async function retryWithBackoff<T>(
 
 // Global error handler instance
 export const globalErrorHandler = new ErrorHandler();
-

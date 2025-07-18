@@ -3,14 +3,21 @@
  * Central orchestration layer that integrates all components for seamless user interactions
  */
 
-import { GoogleAIService } from '../services/google-ai-service';
 import * as crypto from 'crypto';
+
 import { DatabaseService } from '../services/database-service';
-import { PromptEngine, PromptContext, GeneratedQuestion } from './prompt-engine';
-import { AdaptiveLearningEngine } from './adaptive-learning';
-import { performanceMonitor } from '../utils/monitoring';
-import { FylgjaError, ErrorType, createValidationError, createAIServiceError } from '../utils/error-handler';
+import { GoogleAIService } from '../services/google-ai-service';
 import { AIRequest, AIResponse, ConversationMessage, UserAIPreferences } from '../types/ai-types';
+import {
+  FylgjaError,
+  ErrorType,
+  createValidationError,
+  createAIServiceError,
+} from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
+
+import { AdaptiveLearningEngine } from './adaptive-learning';
+import { PromptEngine, PromptContext, GeneratedQuestion } from './prompt-engine';
 
 export interface ProcessingRequest {
   userId: string;
@@ -21,7 +28,7 @@ export interface ProcessingRequest {
   metadata?: Record<string, any>;
 }
 
-export type ProcessingRequestType = 
+export type ProcessingRequestType =
   | 'daily_checkin'
   | 'generate_question'
   | 'process_response'
@@ -108,11 +115,11 @@ export class CoreProcessor {
   private database: DatabaseService;
   private promptEngine: PromptEngine;
   private adaptiveLearning: AdaptiveLearningEngine;
-  
+
   // Session management
   private activeSessions: Map<string, InteractionSession> = new Map();
   private sessionTimeouts: Map<string, NodeJS.Timeout> = new Map();
-  
+
   // Processing configuration
   private readonly SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
   private readonly MAX_CONVERSATION_HISTORY = 50;
@@ -131,62 +138,62 @@ export class CoreProcessor {
   async processRequest(request: ProcessingRequest): Promise<ProcessingResult> {
     const timerId = performanceMonitor.startTimer('core_processing');
     const requestId = this.generateRequestId();
-    
+
     try {
       // Validate request
       this.validateRequest(request);
-      
+
       // Get or create session
       const session = await this.getOrCreateSession(request);
-      
+
       // Process based on request type
       let result: ProcessingResult;
-      
+
       switch (request.requestType) {
         case 'daily_checkin':
           result = await this.processDailyCheckin(request, session);
           break;
-          
+
         case 'generate_question':
           result = await this.processQuestionGeneration(request, session);
           break;
-          
+
         case 'process_response':
           result = await this.processUserResponse(request, session);
           break;
-          
+
         case 'task_analysis':
           result = await this.processTaskAnalysis(request, session);
           break;
-          
+
         case 'goal_setting':
           result = await this.processGoalSetting(request, session);
           break;
-          
+
         case 'reflection_prompt':
           result = await this.processReflectionPrompt(request, session);
           break;
-          
+
         case 'summary_generation':
           result = await this.processSummaryGeneration(request, session);
           break;
-          
+
         case 'proactive_engagement':
           result = await this.processProactiveEngagement(request, session);
           break;
-          
+
         default:
           throw createValidationError(`Unsupported request type: ${request.requestType}`);
       }
-      
+
       // Update session
       await this.updateSession(session, request, result);
-      
+
       // Apply adaptive learning
       if (session.messageCount % this.ADAPTATION_FREQUENCY === 0) {
         await this.applyAdaptiveLearning(request.userId, session);
       }
-      
+
       // Add processing metadata
       result.metadata = {
         ...result.metadata,
@@ -194,19 +201,20 @@ export class CoreProcessor {
         requestId,
         timestamp: new Date().toISOString(),
       };
-      
+
       // Log successful processing
       await this.logProcessingEvent(request, result, null);
-      
+
       return result;
-      
     } catch (error) {
       const processingTime = performanceMonitor.endTimer(timerId);
-      
+
       // Handle error
-      const processedError = error instanceof FylgjaError ? error : 
-        createAIServiceError(`Core processing failed: ${error.message}`);
-      
+      const processedError =
+        error instanceof FylgjaError
+          ? error
+          : createAIServiceError(`Core processing failed: ${error.message}`);
+
       const errorResult: ProcessingResult = {
         success: false,
         metadata: {
@@ -222,10 +230,10 @@ export class CoreProcessor {
           retryable: processedError.retryable,
         },
       };
-      
+
       // Log error
       await this.logProcessingEvent(request, errorResult, processedError);
-      
+
       return errorResult;
     }
   }
@@ -234,21 +242,21 @@ export class CoreProcessor {
    * Process daily check-in request
    */
   private async processDailyCheckin(
-    request: ProcessingRequest, 
+    request: ProcessingRequest,
     session: InteractionSession
   ): Promise<ProcessingResult> {
     const componentsUsed = ['prompt_engine'];
-    
+
     // Generate personalized question
     const promptContext = this.buildPromptContext(request, session);
     const question = await this.promptEngine.generateQuestion(promptContext);
-    
+
     // Track question generation
     performanceMonitor.incrementCounter('questions_generated', 1, {
       category: question.category,
       depth: question.depth,
     });
-    
+
     return {
       success: true,
       question,
@@ -266,14 +274,14 @@ export class CoreProcessor {
    * Process question generation request
    */
   private async processQuestionGeneration(
-    request: ProcessingRequest, 
+    request: ProcessingRequest,
     session: InteractionSession
   ): Promise<ProcessingResult> {
     const componentsUsed = ['prompt_engine'];
-    
+
     const promptContext = this.buildPromptContext(request, session);
     const question = await this.promptEngine.generateQuestion(promptContext);
-    
+
     return {
       success: true,
       question,
@@ -291,15 +299,15 @@ export class CoreProcessor {
    * Process user response
    */
   private async processUserResponse(
-    request: ProcessingRequest, 
+    request: ProcessingRequest,
     session: InteractionSession
   ): Promise<ProcessingResult> {
     if (!request.input) {
       throw createValidationError('User input is required for response processing');
     }
-    
+
     const componentsUsed = ['google_ai', 'adaptive_learning', 'database'];
-    
+
     // Build AI request
     const aiRequest: AIRequest = {
       userId: request.userId,
@@ -309,11 +317,11 @@ export class CoreProcessor {
       context: this.buildAIContext(request, session),
       preferences: request.preferences,
     };
-    
+
     // Process with Google AI
     const aiResponse = await this.googleAI.processRequest(aiRequest);
     componentsUsed.push('google_ai');
-    
+
     // Analyze response for learning
     const lastQuestion = this.getLastQuestion(session);
     if (lastQuestion) {
@@ -326,19 +334,21 @@ export class CoreProcessor {
       );
       componentsUsed.push('adaptive_learning');
     }
-    
+
     // Store interaction
     await this.storeInteraction(request.userId, request.input, aiResponse.response);
     componentsUsed.push('database');
-    
+
     return {
       success: true,
       response: aiResponse.response,
-      suggestions: aiResponse.suggestions ? {
-        tasks: aiResponse.suggestions.tasks.map(t => t.title),
-        questions: aiResponse.suggestions.questions.map(q => q.question),
-        actions: aiResponse.suggestions.actions.map(a => a.action),
-      } : undefined,
+      suggestions: aiResponse.suggestions
+        ? {
+            tasks: aiResponse.suggestions.tasks.map(t => t.title),
+            questions: aiResponse.suggestions.questions.map(q => q.question),
+            actions: aiResponse.suggestions.actions.map(a => a.action),
+          }
+        : undefined,
       metadata: {
         processingTime: 0,
         componentsUsed,
@@ -353,15 +363,15 @@ export class CoreProcessor {
    * Process task analysis request
    */
   private async processTaskAnalysis(
-    request: ProcessingRequest, 
+    request: ProcessingRequest,
     session: InteractionSession
   ): Promise<ProcessingResult> {
     if (!request.input) {
       throw createValidationError('Task description is required for analysis');
     }
-    
+
     const componentsUsed = ['google_ai'];
-    
+
     const aiRequest: AIRequest = {
       userId: request.userId,
       prompt: request.input,
@@ -369,17 +379,19 @@ export class CoreProcessor {
       context: 'Analyze this task and provide breakdown, priorities, and suggestions',
       preferences: request.preferences,
     };
-    
+
     const aiResponse = await this.googleAI.processRequest(aiRequest);
-    
+
     return {
       success: true,
       response: aiResponse.response,
-      suggestions: aiResponse.suggestions ? {
-        tasks: aiResponse.suggestions.tasks.map(t => t.title),
-        questions: aiResponse.suggestions.questions.map(q => q.question),
-        actions: aiResponse.suggestions.actions.map(a => a.action),
-      } : undefined,
+      suggestions: aiResponse.suggestions
+        ? {
+            tasks: aiResponse.suggestions.tasks.map(t => t.title),
+            questions: aiResponse.suggestions.questions.map(q => q.question),
+            actions: aiResponse.suggestions.actions.map(a => a.action),
+          }
+        : undefined,
       metadata: {
         processingTime: 0,
         componentsUsed,
@@ -394,14 +406,14 @@ export class CoreProcessor {
    * Process goal setting request
    */
   private async processGoalSetting(
-    request: ProcessingRequest, 
+    request: ProcessingRequest,
     session: InteractionSession
   ): Promise<ProcessingResult> {
     const componentsUsed = ['google_ai', 'prompt_engine'];
-    
+
     let response: string;
     let suggestions: any;
-    
+
     if (request.input) {
       // Process existing goal input
       const aiRequest: AIRequest = {
@@ -411,7 +423,7 @@ export class CoreProcessor {
         context: 'Help refine and structure this goal',
         preferences: request.preferences,
       };
-      
+
       const aiResponse = await this.googleAI.processRequest(aiRequest);
       response = aiResponse.response;
       suggestions = aiResponse.suggestions;
@@ -419,19 +431,21 @@ export class CoreProcessor {
       // Generate goal-setting question
       const promptContext = this.buildPromptContext(request, session);
       promptContext.userMood = 'positive'; // Goal setting works better with positive framing
-      
+
       const question = await this.promptEngine.generateQuestion(promptContext);
       response = question.question;
     }
-    
+
     return {
       success: true,
       response,
-      suggestions: suggestions ? {
-        tasks: suggestions.tasks?.map((t: any) => t.title) || [],
-        questions: suggestions.questions?.map((q: any) => q.question) || [],
-        actions: suggestions.actions?.map((a: any) => a.action) || [],
-      } : undefined,
+      suggestions: suggestions
+        ? {
+            tasks: suggestions.tasks?.map((t: any) => t.title) || [],
+            questions: suggestions.questions?.map((q: any) => q.question) || [],
+            actions: suggestions.actions?.map((a: any) => a.action) || [],
+          }
+        : undefined,
       metadata: {
         processingTime: 0,
         componentsUsed,
@@ -446,17 +460,17 @@ export class CoreProcessor {
    * Process reflection prompt request
    */
   private async processReflectionPrompt(
-    request: ProcessingRequest, 
+    request: ProcessingRequest,
     session: InteractionSession
   ): Promise<ProcessingResult> {
     const componentsUsed = ['prompt_engine'];
-    
+
     const promptContext = this.buildPromptContext(request, session);
     promptContext.userMood = 'reflective';
-    
+
     // Force deeper questions for reflection
     const question = await this.promptEngine.generateQuestion(promptContext);
-    
+
     return {
       success: true,
       question,
@@ -475,18 +489,19 @@ export class CoreProcessor {
    * Process summary generation request
    */
   private async processSummaryGeneration(
-    request: ProcessingRequest, 
+    request: ProcessingRequest,
     session: InteractionSession
   ): Promise<ProcessingResult> {
     const componentsUsed = ['google_ai', 'database'];
-    
+
     // Get recent interactions for summary
     const recentInteractions = await this.database.getRecentInteractions(request.userId, 10);
-    
+
     if (recentInteractions.length === 0) {
       return {
         success: true,
-        response: "I don't have enough recent interactions to create a meaningful summary. Let's have a few more conversations first!",
+        response:
+          "I don't have enough recent interactions to create a meaningful summary. Let's have a few more conversations first!",
         metadata: {
           processingTime: 0,
           componentsUsed: ['database'],
@@ -496,22 +511,25 @@ export class CoreProcessor {
         },
       };
     }
-    
+
     // Build summary context
     const interactionSummary = recentInteractions
-      .map(interaction => `${interaction.timestamp}: ${interaction.userMessage} -> ${interaction.aiResponse}`)
+      .map(
+        interaction =>
+          `${interaction.timestamp}: ${interaction.userMessage} -> ${interaction.aiResponse}`
+      )
       .join('\n');
-    
+
     const aiRequest: AIRequest = {
       userId: request.userId,
-      prompt: `Please create a thoughtful summary of our recent conversations and interactions.`,
+      prompt: 'Please create a thoughtful summary of our recent conversations and interactions.',
       requestType: 'response_generation',
       context: `Recent interactions:\n${interactionSummary}`,
       preferences: request.preferences,
     };
-    
+
     const aiResponse = await this.googleAI.processRequest(aiRequest);
-    
+
     return {
       success: true,
       response: aiResponse.response,
@@ -529,32 +547,32 @@ export class CoreProcessor {
    * Process proactive engagement request
    */
   private async processProactiveEngagement(
-    request: ProcessingRequest, 
+    request: ProcessingRequest,
     session: InteractionSession
   ): Promise<ProcessingResult> {
     const componentsUsed = ['database', 'prompt_engine', 'google_ai'];
-    
+
     // Check user's recent activity and engagement
     const userProfile = await this.database.getUserProfile(request.userId);
     const recentInteractions = await this.database.getRecentInteractions(request.userId, 5);
-    
+
     // Determine engagement strategy
     const engagementStrategy = this.determineEngagementStrategy(userProfile, recentInteractions);
-    
+
     let response: string;
-    
+
     switch (engagementStrategy) {
       case 'check_in':
         const promptContext = this.buildPromptContext(request, session);
         const question = await this.promptEngine.generateQuestion(promptContext);
         response = `Hi! ${question.question}`;
         break;
-        
+
       case 'follow_up':
         const lastInteraction = recentInteractions[0];
         const aiRequest: AIRequest = {
           userId: request.userId,
-          prompt: `Create a thoughtful follow-up based on our last conversation.`,
+          prompt: 'Create a thoughtful follow-up based on our last conversation.',
           requestType: 'response_generation',
           context: `Last interaction: ${lastInteraction?.userMessage} -> ${lastInteraction?.aiResponse}`,
           preferences: request.preferences,
@@ -562,15 +580,16 @@ export class CoreProcessor {
         const aiResponse = await this.googleAI.processRequest(aiRequest);
         response = aiResponse.response;
         break;
-        
+
       case 'encouragement':
-        response = "I've been thinking about our conversations and wanted to check in. How are you doing today?";
+        response =
+          "I've been thinking about our conversations and wanted to check in. How are you doing today?";
         break;
-        
+
       default:
         response = "Hello! I hope you're having a good day. What's on your mind?";
     }
-    
+
     return {
       success: true,
       response,
@@ -589,17 +608,17 @@ export class CoreProcessor {
    */
   private async getOrCreateSession(request: ProcessingRequest): Promise<InteractionSession> {
     const sessionKey = `${request.userId}_${request.context?.platform || 'api'}`;
-    
+
     // Check for existing session
     if (this.activeSessions.has(sessionKey)) {
       const session = this.activeSessions.get(sessionKey)!;
-      
+
       // Reset timeout
       this.resetSessionTimeout(sessionKey);
-      
+
       return session;
     }
-    
+
     // Create new session
     const session: InteractionSession = {
       sessionId: request.context?.sessionId || this.generateSessionId(),
@@ -622,10 +641,10 @@ export class CoreProcessor {
         adaptationCount: 0,
       },
     };
-    
+
     this.activeSessions.set(sessionKey, session);
     this.resetSessionTimeout(sessionKey);
-    
+
     return session;
   }
 
@@ -633,18 +652,18 @@ export class CoreProcessor {
    * Update session after processing
    */
   private async updateSession(
-    session: InteractionSession, 
-    request: ProcessingRequest, 
+    session: InteractionSession,
+    request: ProcessingRequest,
     result: ProcessingResult
   ): Promise<void> {
     session.lastActivity = new Date().toISOString();
     session.messageCount++;
     session.sessionMetrics.totalProcessingTime += result.metadata.processingTime;
-    
+
     if (!result.success) {
       session.sessionMetrics.errorCount++;
     }
-    
+
     // Update conversation history
     if (request.input) {
       session.conversationHistory.push({
@@ -653,7 +672,7 @@ export class CoreProcessor {
         timestamp: new Date().toISOString(),
       });
     }
-    
+
     if (result.response) {
       session.conversationHistory.push({
         role: 'assistant',
@@ -661,12 +680,14 @@ export class CoreProcessor {
         timestamp: new Date().toISOString(),
       });
     }
-    
+
     // Limit conversation history
     if (session.conversationHistory.length > this.MAX_CONVERSATION_HISTORY) {
-      session.conversationHistory = session.conversationHistory.slice(-this.MAX_CONVERSATION_HISTORY);
+      session.conversationHistory = session.conversationHistory.slice(
+        -this.MAX_CONVERSATION_HISTORY
+      );
     }
-    
+
     // Update user state based on interaction
     await this.updateUserState(session, request, result);
   }
@@ -677,14 +698,14 @@ export class CoreProcessor {
   private async applyAdaptiveLearning(userId: string, session: InteractionSession): Promise<void> {
     try {
       const recommendations = await this.adaptiveLearning.getAdaptationRecommendations(userId);
-      
+
       if (recommendations.length > 0) {
         // Apply high-confidence recommendations
         const highConfidenceRecs = recommendations.filter(rec => rec.confidence >= 0.8);
-        
+
         if (highConfidenceRecs.length > 0) {
           session.sessionMetrics.adaptationCount += highConfidenceRecs.length;
-          
+
           // Log adaptations
           performanceMonitor.incrementCounter('adaptations_applied', highConfidenceRecs.length, {
             userId,
@@ -704,11 +725,11 @@ export class CoreProcessor {
     if (!request.userId) {
       throw createValidationError('User ID is required');
     }
-    
+
     if (!request.requestType) {
       throw createValidationError('Request type is required');
     }
-    
+
     // Validate input for requests that require it
     const inputRequiredTypes: ProcessingRequestType[] = ['process_response', 'task_analysis'];
     if (inputRequiredTypes.includes(request.requestType) && !request.input) {
@@ -716,10 +737,13 @@ export class CoreProcessor {
     }
   }
 
-  private buildPromptContext(request: ProcessingRequest, session: InteractionSession): PromptContext {
+  private buildPromptContext(
+    request: ProcessingRequest,
+    session: InteractionSession
+  ): PromptContext {
     const now = new Date();
     const timeOfDay = this.getTimeOfDay(now);
-    
+
     return {
       userId: request.userId,
       timeOfDay,
@@ -747,22 +771,26 @@ export class CoreProcessor {
       `Message count: ${session.messageCount}`,
       `User engagement: ${session.userState.engagement}`,
     ];
-    
+
     if (session.userState.topics.length > 0) {
       context.push(`Recent topics: ${session.userState.topics.join(', ')}`);
     }
-    
+
     if (session.userState.goals.length > 0) {
       context.push(`Current goals: ${session.userState.goals.join(', ')}`);
     }
-    
+
     return context.join('\n');
   }
 
   private getTimeOfDay(date: Date): 'morning' | 'afternoon' | 'evening' {
     const hour = date.getHours();
-    if (hour < 12) return 'morning';
-    if (hour < 17) return 'afternoon';
+    if (hour < 12) {
+      return 'morning';
+    }
+    if (hour < 17) {
+      return 'afternoon';
+    }
     return 'evening';
   }
 
@@ -785,31 +813,34 @@ export class CoreProcessor {
   }
 
   private determineEngagementStrategy(userProfile: any, recentInteractions: any[]): string {
-    if (recentInteractions.length === 0) return 'check_in';
-    
+    if (recentInteractions.length === 0) {
+      return 'check_in';
+    }
+
     const lastInteraction = recentInteractions[0];
     const timeSinceLastInteraction = Date.now() - new Date(lastInteraction.timestamp).getTime();
-    
+
     // If it's been more than 24 hours, do a check-in
     if (timeSinceLastInteraction > 24 * 60 * 60 * 1000) {
       return 'check_in';
     }
-    
+
     // If recent interactions show low engagement, try encouragement
-    const avgEngagement = recentInteractions.reduce((sum, interaction) => {
-      return sum + (interaction.userMessage?.length || 0);
-    }, 0) / recentInteractions.length;
-    
+    const avgEngagement =
+      recentInteractions.reduce((sum, interaction) => {
+        return sum + (interaction.userMessage?.length || 0);
+      }, 0) / recentInteractions.length;
+
     if (avgEngagement < 50) {
       return 'encouragement';
     }
-    
+
     return 'follow_up';
   }
 
   private async updateUserState(
-    session: InteractionSession, 
-    request: ProcessingRequest, 
+    session: InteractionSession,
+    request: ProcessingRequest,
     result: ProcessingResult
   ): Promise<void> {
     // Simple engagement calculation based on response length and success
@@ -823,20 +854,26 @@ export class CoreProcessor {
         session.userState.engagement = 'low';
       }
     }
-    
+
     // Update topics based on suggestions
     if (result.suggestions?.tasks) {
       // Extract topics from tasks (simplified)
       const topics = result.suggestions.tasks
         .map(task => task.toLowerCase())
-        .filter(task => task.includes('work') || task.includes('health') || task.includes('learning'))
+        .filter(
+          task => task.includes('work') || task.includes('health') || task.includes('learning')
+        )
         .slice(0, 3);
-      
+
       session.userState.topics = [...new Set([...session.userState.topics, ...topics])].slice(-5);
     }
   }
 
-  private async storeInteraction(userId: string, userMessage: string, aiResponse: string): Promise<void> {
+  private async storeInteraction(
+    userId: string,
+    userMessage: string,
+    aiResponse: string
+  ): Promise<void> {
     try {
       await this.database.saveInteraction({
         userId,
@@ -854,8 +891,8 @@ export class CoreProcessor {
   }
 
   private async logProcessingEvent(
-    request: ProcessingRequest, 
-    result: ProcessingResult, 
+    request: ProcessingRequest,
+    result: ProcessingResult,
     error: FylgjaError | null
   ): Promise<void> {
     try {
@@ -883,13 +920,13 @@ export class CoreProcessor {
     if (existingTimeout) {
       clearTimeout(existingTimeout);
     }
-    
+
     // Set new timeout
     const timeout = setTimeout(() => {
       this.activeSessions.delete(sessionKey);
       this.sessionTimeouts.delete(sessionKey);
     }, this.SESSION_TIMEOUT);
-    
+
     this.sessionTimeouts.set(sessionKey, timeout);
   }
 
@@ -916,14 +953,14 @@ export class CoreProcessor {
 
   public async endSession(userId: string, platform: string): Promise<void> {
     const sessionKey = `${userId}_${platform}`;
-    
+
     // Clear timeout
     const timeout = this.sessionTimeouts.get(sessionKey);
     if (timeout) {
       clearTimeout(timeout);
       this.sessionTimeouts.delete(sessionKey);
     }
-    
+
     // Remove session
     this.activeSessions.delete(sessionKey);
   }
@@ -941,7 +978,7 @@ export class CoreProcessor {
     };
   }> {
     const components: Record<string, 'healthy' | 'unhealthy'> = {};
-    
+
     // Check Google AI service
     try {
       await this.googleAI.getOverallMetrics();
@@ -949,7 +986,7 @@ export class CoreProcessor {
     } catch {
       components.googleAI = 'unhealthy';
     }
-    
+
     // Check database service
     try {
       await this.database.healthCheck();
@@ -957,15 +994,17 @@ export class CoreProcessor {
     } catch {
       components.database = 'unhealthy';
     }
-    
+
     // Check other components
     components.promptEngine = 'healthy'; // No async operations to check
     components.adaptiveLearning = 'healthy'; // No async operations to check
-    
-    const unhealthyCount = Object.values(components).filter(status => status === 'unhealthy').length;
-    const status = unhealthyCount === 0 ? 'healthy' : 
-                  unhealthyCount <= 1 ? 'degraded' : 'unhealthy';
-    
+
+    const unhealthyCount = Object.values(components).filter(
+      status => status === 'unhealthy'
+    ).length;
+    const status =
+      unhealthyCount === 0 ? 'healthy' : unhealthyCount <= 1 ? 'degraded' : 'unhealthy';
+
     return {
       status,
       components,
@@ -980,4 +1019,3 @@ export class CoreProcessor {
 
 // Global core processor instance
 export const coreProcessor = new CoreProcessor();
-

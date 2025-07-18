@@ -4,11 +4,11 @@
  */
 
 import { CoreProcessor } from '../core/core-processor';
-import { EnhancedDatabaseService } from '../services/enhanced-database-service';
-import { GoogleAIService } from '../services/google-ai-service';
 import { PromptEngine } from '../core/prompt-engine';
 import { ResponseGenerator } from '../core/response-generator';
 import { APIPerformanceMonitor } from '../monitoring/api-performance-monitor';
+import { EnhancedDatabaseService } from '../services/enhanced-database-service';
+import { GoogleAIService } from '../services/google-ai-service';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
 
 // Scheduling interfaces
@@ -124,8 +124,8 @@ export class ScheduledTasksManager {
     performanceThresholds: {
       maxExecutionTime: 180000, // 3 minutes
       maxErrorRate: 0.05, // 5%
-      minSuccessRate: 0.95 // 95%
-    }
+      minSuccessRate: 0.95, // 95%
+    },
   };
 
   private constructor() {
@@ -161,8 +161,8 @@ export class ScheduledTasksManager {
         totalAttempts: 0,
         successfulAttempts: 0,
         failedAttempts: 0,
-        averageProcessingTime: 0
-      }
+        averageProcessingTime: 0,
+      },
     };
 
     try {
@@ -174,7 +174,7 @@ export class ScheduledTasksManager {
 
       // Process users in batches
       const batches = this.createBatches(scheduledUsers, this.config.batchSize);
-      
+
       for (const batch of batches) {
         await this.processDailyCheckInBatch(batch, result);
       }
@@ -182,26 +182,29 @@ export class ScheduledTasksManager {
       // Calculate metrics
       result.duration = Date.now() - startTime;
       result.metrics.averageProcessingTime = result.duration / Math.max(result.processedUsers, 1);
-      result.success = result.metrics.failedAttempts / result.metrics.totalAttempts < this.config.performanceThresholds.maxErrorRate;
+      result.success =
+        result.metrics.failedAttempts / result.metrics.totalAttempts <
+        this.config.performanceThresholds.maxErrorRate;
 
       // Schedule next execution
       result.nextScheduledTime = this.calculateNextDailyCheckInTime(context.executionTime);
 
-      console.log(`Daily check-ins completed: ${result.processedUsers} users processed, ${result.errors.length} errors`);
-
+      console.log(
+        `Daily check-ins completed: ${result.processedUsers} users processed, ${result.errors.length} errors`
+      );
     } catch (error) {
       result.success = false;
       result.duration = Date.now() - startTime;
-      
+
       console.error('Daily check-in execution failed:', error);
-      
+
       throw new FylgjaError({
         type: ErrorType.SERVICE_UNAVAILABLE,
         message: 'Daily check-in execution failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, context }
-        }
+          metadata: { error: error.message, context },
+        },
       });
     }
 
@@ -226,8 +229,8 @@ export class ScheduledTasksManager {
         totalAttempts: 0,
         successfulAttempts: 0,
         failedAttempts: 0,
-        averageProcessingTime: 0
-      }
+        averageProcessingTime: 0,
+      },
     };
 
     try {
@@ -249,7 +252,7 @@ export class ScheduledTasksManager {
           result.errors.push({
             userId,
             error: error.message,
-            severity: 'medium'
+            severity: 'medium',
           });
           result.metrics.failedAttempts += userReminders.length;
         }
@@ -257,23 +260,24 @@ export class ScheduledTasksManager {
 
       result.duration = Date.now() - startTime;
       result.metrics.averageProcessingTime = result.duration / Math.max(result.processedUsers, 1);
-      result.success = result.metrics.failedAttempts / result.metrics.totalAttempts < this.config.performanceThresholds.maxErrorRate;
+      result.success =
+        result.metrics.failedAttempts / result.metrics.totalAttempts <
+        this.config.performanceThresholds.maxErrorRate;
 
       console.log(`Reminders completed: ${result.processedUsers} users processed`);
-
     } catch (error) {
       result.success = false;
       result.duration = Date.now() - startTime;
-      
+
       console.error('Reminder execution failed:', error);
-      
+
       throw new FylgjaError({
         type: ErrorType.SERVICE_UNAVAILABLE,
         message: 'Reminder execution failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, context }
-        }
+          metadata: { error: error.message, context },
+        },
       });
     }
 
@@ -285,7 +289,9 @@ export class ScheduledTasksManager {
    * Summary Generation Scheduler
    * Generates weekly and monthly summaries for users
    */
-  public async executeSummaryGeneration(context: ScheduledTaskContext): Promise<TaskExecutionResult> {
+  public async executeSummaryGeneration(
+    context: ScheduledTaskContext
+  ): Promise<TaskExecutionResult> {
     const startTime = Date.now();
     const result: TaskExecutionResult = {
       success: true,
@@ -298,8 +304,8 @@ export class ScheduledTasksManager {
         totalAttempts: 0,
         successfulAttempts: 0,
         failedAttempts: 0,
-        averageProcessingTime: 0
-      }
+        averageProcessingTime: 0,
+      },
     };
 
     try {
@@ -312,30 +318,31 @@ export class ScheduledTasksManager {
 
       // Process summaries in batches (smaller batches due to complexity)
       const batches = this.createBatches(scheduledSummaries, Math.floor(this.config.batchSize / 2));
-      
+
       for (const batch of batches) {
         await this.processSummaryBatch(batch, result);
       }
 
       result.duration = Date.now() - startTime;
       result.metrics.averageProcessingTime = result.duration / Math.max(result.processedUsers, 1);
-      result.success = result.metrics.failedAttempts / result.metrics.totalAttempts < this.config.performanceThresholds.maxErrorRate;
+      result.success =
+        result.metrics.failedAttempts / result.metrics.totalAttempts <
+        this.config.performanceThresholds.maxErrorRate;
 
       console.log(`Summary generation completed: ${result.processedUsers} users processed`);
-
     } catch (error) {
       result.success = false;
       result.duration = Date.now() - startTime;
-      
+
       console.error('Summary generation failed:', error);
-      
+
       throw new FylgjaError({
         type: ErrorType.SERVICE_UNAVAILABLE,
         message: 'Summary generation failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, context }
-        }
+          metadata: { error: error.message, context },
+        },
       });
     }
 
@@ -347,7 +354,9 @@ export class ScheduledTasksManager {
    * Maintenance Tasks Scheduler
    * Performs system maintenance operations
    */
-  public async executeMaintenanceTasks(context: ScheduledTaskContext): Promise<TaskExecutionResult> {
+  public async executeMaintenanceTasks(
+    context: ScheduledTaskContext
+  ): Promise<TaskExecutionResult> {
     const startTime = Date.now();
     const result: TaskExecutionResult = {
       success: true,
@@ -360,8 +369,8 @@ export class ScheduledTasksManager {
         totalAttempts: 0,
         successfulAttempts: 0,
         failedAttempts: 0,
-        averageProcessingTime: 0
-      }
+        averageProcessingTime: 0,
+      },
     };
 
     try {
@@ -389,16 +398,15 @@ export class ScheduledTasksManager {
       result.success = result.errors.length === 0;
 
       console.log(`Maintenance task ${maintenanceType} completed in ${result.duration}ms`);
-
     } catch (error) {
       result.success = false;
       result.duration = Date.now() - startTime;
       result.errors.push({
         userId: 'system',
         error: error.message,
-        severity: 'high'
+        severity: 'high',
       });
-      
+
       console.error('Maintenance task failed:', error);
     }
 
@@ -410,7 +418,9 @@ export class ScheduledTasksManager {
    * Proactive Engagement Scheduler
    * Identifies users who might benefit from proactive outreach
    */
-  public async executeProactiveEngagement(context: ScheduledTaskContext): Promise<TaskExecutionResult> {
+  public async executeProactiveEngagement(
+    context: ScheduledTaskContext
+  ): Promise<TaskExecutionResult> {
     const startTime = Date.now();
     const result: TaskExecutionResult = {
       success: true,
@@ -423,8 +433,8 @@ export class ScheduledTasksManager {
         totalAttempts: 0,
         successfulAttempts: 0,
         failedAttempts: 0,
-        averageProcessingTime: 0
-      }
+        averageProcessingTime: 0,
+      },
     };
 
     try {
@@ -443,7 +453,7 @@ export class ScheduledTasksManager {
           result.errors.push({
             userId,
             error: error.message,
-            severity: 'low'
+            severity: 'low',
           });
           result.metrics.failedAttempts++;
         }
@@ -451,14 +461,15 @@ export class ScheduledTasksManager {
 
       result.duration = Date.now() - startTime;
       result.metrics.averageProcessingTime = result.duration / Math.max(result.processedUsers, 1);
-      result.success = result.metrics.failedAttempts / result.metrics.totalAttempts < this.config.performanceThresholds.maxErrorRate;
+      result.success =
+        result.metrics.failedAttempts / result.metrics.totalAttempts <
+        this.config.performanceThresholds.maxErrorRate;
 
       console.log(`Proactive engagement completed: ${result.processedUsers} users engaged`);
-
     } catch (error) {
       result.success = false;
       result.duration = Date.now() - startTime;
-      
+
       console.error('Proactive engagement failed:', error);
     }
 
@@ -474,14 +485,14 @@ export class ScheduledTasksManager {
     // Get users scheduled for check-ins within the next hour
     const timeWindow = {
       start: new Date(executionTime.getTime() - 30 * 60 * 1000), // 30 minutes before
-      end: new Date(executionTime.getTime() + 30 * 60 * 1000)    // 30 minutes after
+      end: new Date(executionTime.getTime() + 30 * 60 * 1000), // 30 minutes after
     };
 
     // Query database for users with check-in preferences matching this time
     const users = await this.database.getUsersForScheduledTask('daily_checkin', timeWindow);
-    
+
     const tasks: DailyCheckInTask[] = [];
-    
+
     for (const user of users) {
       // Check if user is in quiet hours
       if (await this.isUserInQuietHours(user.userId, executionTime)) {
@@ -492,7 +503,7 @@ export class ScheduledTasksManager {
       const question = await this.promptEngine.generatePrompt({
         userId: user.userId,
         type: 'checkin',
-        context: { timeOfDay: this.getTimeOfDay(executionTime, user.timezone) }
+        context: { timeOfDay: this.getTimeOfDay(executionTime, user.timezone) },
       });
 
       tasks.push({
@@ -502,28 +513,31 @@ export class ScheduledTasksManager {
         personalizedQuestion: question.question,
         questionStyle: question.style,
         depth: question.depth,
-        retryCount: 0
+        retryCount: 0,
       });
     }
 
     return tasks;
   }
 
-  private async processDailyCheckInBatch(batch: DailyCheckInTask[], result: TaskExecutionResult): Promise<void> {
-    const batchPromises = batch.map(async (task) => {
+  private async processDailyCheckInBatch(
+    batch: DailyCheckInTask[],
+    result: TaskExecutionResult
+  ): Promise<void> {
+    const batchPromises = batch.map(async task => {
       try {
         // Send personalized check-in message
         const response = await this.coreProcessor.processRequest({
           userId: task.userId,
           type: 'daily_checkin',
           input: task.personalizedQuestion,
-          platform: 'scheduler'
+          platform: 'scheduler',
         });
 
         if (response.success) {
           result.metrics.successfulAttempts++;
           result.processedUsers++;
-          
+
           // Record performance metrics
           this.performanceMonitor.recordMetric({
             endpoint: '/scheduler/daily-checkin',
@@ -534,7 +548,7 @@ export class ScheduledTasksManager {
             platform: 'scheduler',
             requestSize: task.personalizedQuestion.length,
             responseSize: response.response?.length || 0,
-            cacheHit: false
+            cacheHit: false,
           });
         } else {
           throw new Error(response.error?.message || 'Check-in failed');
@@ -543,7 +557,7 @@ export class ScheduledTasksManager {
         result.errors.push({
           userId: task.userId,
           error: error.message,
-          severity: 'medium'
+          severity: 'medium',
         });
         result.metrics.failedAttempts++;
       }
@@ -559,26 +573,26 @@ export class ScheduledTasksManager {
 
   private groupRemindersByUser(reminders: ReminderTask[]): Map<string, ReminderTask[]> {
     const grouped = new Map<string, ReminderTask[]>();
-    
+
     for (const reminder of reminders) {
       if (!grouped.has(reminder.userId)) {
         grouped.set(reminder.userId, []);
       }
       grouped.get(reminder.userId)!.push(reminder);
     }
-    
+
     return grouped;
   }
 
   private async processUserReminders(userId: string, reminders: ReminderTask[]): Promise<void> {
     // Combine multiple reminders into a single message if appropriate
     const combinedMessage = this.combineReminders(reminders);
-    
+
     await this.coreProcessor.processRequest({
       userId,
       type: 'proactive_engagement',
       input: combinedMessage,
-      platform: 'scheduler'
+      platform: 'scheduler',
     });
 
     // Mark reminders as sent
@@ -587,28 +601,37 @@ export class ScheduledTasksManager {
     }
   }
 
-  private async getUsersForSummary(executionTime: Date, summaryType: string): Promise<SummaryTask[]> {
-    const users = await this.database.getUsersForScheduledTask(`${summaryType}_summary`, executionTime);
-    
+  private async getUsersForSummary(
+    executionTime: Date,
+    summaryType: string
+  ): Promise<SummaryTask[]> {
+    const users = await this.database.getUsersForScheduledTask(
+      `${summaryType}_summary`,
+      executionTime
+    );
+
     return users.map(user => ({
       userId: user.userId,
       type: summaryType as 'weekly_summary' | 'monthly_summary',
       period: this.calculateSummaryPeriod(executionTime, summaryType),
       scheduledTime: executionTime,
       includeInsights: true,
-      includeGoalProgress: true
+      includeGoalProgress: true,
     }));
   }
 
-  private async processSummaryBatch(batch: SummaryTask[], result: TaskExecutionResult): Promise<void> {
-    const batchPromises = batch.map(async (task) => {
+  private async processSummaryBatch(
+    batch: SummaryTask[],
+    result: TaskExecutionResult
+  ): Promise<void> {
+    const batchPromises = batch.map(async task => {
       try {
         // Generate summary using AI service
         const summaryResponse = await this.coreProcessor.processRequest({
           userId: task.userId,
           type: 'summary_generation',
           input: `Generate ${task.type} for period ${task.period.start.toISOString()} to ${task.period.end.toISOString()}`,
-          platform: 'scheduler'
+          platform: 'scheduler',
         });
 
         if (summaryResponse.success) {
@@ -621,7 +644,7 @@ export class ScheduledTasksManager {
         result.errors.push({
           userId: task.userId,
           error: error.message,
-          severity: 'medium'
+          severity: 'medium',
         });
         result.metrics.failedAttempts++;
       }
@@ -635,13 +658,13 @@ export class ScheduledTasksManager {
       // Clean up old interaction records
       const cleanupResult = await this.database.cleanupOldRecords();
       result.metrics.successfulAttempts = cleanupResult.deletedRecords;
-      
+
       console.log(`Database cleanup completed: ${cleanupResult.deletedRecords} records removed`);
     } catch (error) {
       result.errors.push({
         userId: 'system',
         error: `Database cleanup failed: ${error.message}`,
-        severity: 'high'
+        severity: 'high',
       });
     }
   }
@@ -651,13 +674,13 @@ export class ScheduledTasksManager {
       // Refresh critical caches
       await this.database.refreshCaches();
       result.metrics.successfulAttempts = 1;
-      
+
       console.log('Cache refresh completed');
     } catch (error) {
       result.errors.push({
         userId: 'system',
         error: `Cache refresh failed: ${error.message}`,
-        severity: 'medium'
+        severity: 'medium',
       });
     }
   }
@@ -670,17 +693,17 @@ export class ScheduledTasksManager {
         new Date(),
         'endpoint'
       );
-      
+
       // Store performance insights
       await this.database.storePerformanceReport(performanceReport);
       result.metrics.successfulAttempts = 1;
-      
+
       console.log('Performance analysis completed');
     } catch (error) {
       result.errors.push({
         userId: 'system',
         error: `Performance analysis failed: ${error.message}`,
-        severity: 'medium'
+        severity: 'medium',
       });
     }
   }
@@ -689,23 +712,23 @@ export class ScheduledTasksManager {
     try {
       // Perform comprehensive health check
       const healthStatus = await this.performanceMonitor.getSystemHealth();
-      
+
       if (healthStatus.status !== 'healthy') {
         result.errors.push({
           userId: 'system',
           error: `System health check failed: ${healthStatus.status}`,
-          severity: healthStatus.status === 'unhealthy' ? 'critical' : 'medium'
+          severity: healthStatus.status === 'unhealthy' ? 'critical' : 'medium',
         });
       } else {
         result.metrics.successfulAttempts = 1;
       }
-      
+
       console.log(`Health check completed: ${healthStatus.status}`);
     } catch (error) {
       result.errors.push({
         userId: 'system',
         error: `Health check failed: ${error.message}`,
-        severity: 'high'
+        severity: 'high',
       });
     }
   }
@@ -720,14 +743,14 @@ export class ScheduledTasksManager {
     const engagementPrompt = await this.promptEngine.generatePrompt({
       userId,
       type: 'proactive_engagement',
-      context: { reason: 'check_in' }
+      context: { reason: 'check_in' },
     });
 
     await this.coreProcessor.processRequest({
       userId,
       type: 'proactive_engagement',
       input: engagementPrompt.question,
-      platform: 'scheduler'
+      platform: 'scheduler',
     });
   }
 
@@ -742,7 +765,9 @@ export class ScheduledTasksManager {
 
   private async isUserInQuietHours(userId: string, currentTime: Date): Promise<boolean> {
     const userPrefs = await this.database.getUserSchedulePreferences(userId);
-    if (!userPrefs?.quietHours) return false;
+    if (!userPrefs?.quietHours) {
+      return false;
+    }
 
     const userTime = this.convertToUserTimezone(currentTime, userPrefs.timezone);
     const currentHour = userTime.getHours();
@@ -765,11 +790,19 @@ export class ScheduledTasksManager {
   private getTimeOfDay(time: Date, timezone: string): string {
     const userTime = this.convertToUserTimezone(time, timezone);
     const hour = userTime.getHours();
-    
-    if (hour < 6) return 'night';
-    if (hour < 12) return 'morning';
-    if (hour < 17) return 'afternoon';
-    if (hour < 21) return 'evening';
+
+    if (hour < 6) {
+      return 'night';
+    }
+    if (hour < 12) {
+      return 'morning';
+    }
+    if (hour < 17) {
+      return 'afternoon';
+    }
+    if (hour < 21) {
+      return 'evening';
+    }
     return 'night';
   }
 
@@ -794,7 +827,10 @@ export class ScheduledTasksManager {
     return `You have ${reminders.length} reminders:\n${reminderTexts.join('\n')}`;
   }
 
-  private calculateSummaryPeriod(executionTime: Date, summaryType: string): { start: Date; end: Date } {
+  private calculateSummaryPeriod(
+    executionTime: Date,
+    summaryType: string
+  ): { start: Date; end: Date } {
     const end = new Date(executionTime);
     const start = new Date(executionTime);
 
@@ -809,7 +845,7 @@ export class ScheduledTasksManager {
 
   private recordTaskExecution(result: TaskExecutionResult): void {
     this.executionHistory.push(result);
-    
+
     // Maintain history size limit
     if (this.executionHistory.length > this.maxHistorySize) {
       this.executionHistory.shift();
@@ -823,7 +859,7 @@ export class ScheduledTasksManager {
       statusCode: result.success ? 200 : 500,
       requestSize: 0,
       responseSize: 0,
-      cacheHit: false
+      cacheHit: false,
     });
   }
 
@@ -847,7 +883,7 @@ export class ScheduledTasksManager {
         successRate: 0,
         averageExecutionTime: 0,
         averageUsersProcessed: 0,
-        errorRate: 0
+        errorRate: 0,
       };
     }
 
@@ -861,11 +897,10 @@ export class ScheduledTasksManager {
       successRate: successful / this.executionHistory.length,
       averageExecutionTime: totalDuration / this.executionHistory.length,
       averageUsersProcessed: totalUsers / this.executionHistory.length,
-      errorRate: totalErrors / this.executionHistory.length
+      errorRate: totalErrors / this.executionHistory.length,
     };
   }
 }
 
 // Export singleton instance
 export const scheduledTasksManager = ScheduledTasksManager.getInstance();
-

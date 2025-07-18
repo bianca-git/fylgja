@@ -1,25 +1,27 @@
 /**
  * X (Twitter) DM Webhook Handler for Fylgja
  * Handles incoming X Direct Messages via X API v2
- * 
+ *
  * PLACEHOLDER IMPLEMENTATION - Ready for development
  */
 
-import * as functions from 'firebase-functions';
+import * as crypto from 'crypto';
+
 import { Request, Response } from 'express';
-import { XDMProcessor } from '../services/x-dm-processor';
-import { XAPIService } from '../services/x-api-service';
-import { APIValidator } from '../validation/api-validator';
+import * as functions from 'firebase-functions';
+
 import { APIPerformanceMonitor } from '../monitoring/api-performance-monitor';
+import { XAPIService } from '../services/x-api-service';
+import { XDMProcessor } from '../services/x-dm-processor';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
 import { RateLimiter } from '../utils/rate-limiter';
-import * as crypto from 'crypto';
+import { APIValidator } from '../validation/api-validator';
 
 // X DM webhook configuration
 const webhookConfig = {
   timeoutSeconds: 60,
   memory: '512MB' as const,
-  region: 'us-central1'
+  region: 'us-central1',
 };
 
 /**
@@ -30,7 +32,7 @@ export const xDMWebhook = functions
   .region(webhookConfig.region)
   .runWith({
     timeoutSeconds: webhookConfig.timeoutSeconds,
-    memory: webhookConfig.memory
+    memory: webhookConfig.memory,
   })
   .https.onRequest(async (req: Request, res: Response) => {
     const performanceMonitor = APIPerformanceMonitor.getInstance();
@@ -43,7 +45,7 @@ export const xDMWebhook = functions
         method: req.method,
         headers: req.headers,
         body: req.body,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       // Handle webhook verification (GET request for CRC)
@@ -56,7 +58,7 @@ export const xDMWebhook = functions
         return res.status(405).json({
           error: 'Method not allowed',
           message: 'X DM webhook only accepts GET (CRC) and POST (events) requests',
-          requestId
+          requestId,
         });
       }
 
@@ -70,13 +72,13 @@ export const xDMWebhook = functions
       if (!isValidSignature) {
         console.warn('Invalid X signature detected', {
           requestId,
-          signature: req.headers['x-twitter-webhooks-signature']
+          signature: req.headers['x-twitter-webhooks-signature'],
         });
 
         return res.status(401).json({
           error: 'Unauthorized',
           message: 'Invalid webhook signature',
-          requestId
+          requestId,
         });
       }
 
@@ -90,14 +92,14 @@ export const xDMWebhook = functions
           requestId,
           clientId,
           remainingPoints: rateLimitResult.remainingPoints,
-          resetTime: rateLimitResult.resetTime
+          resetTime: rateLimitResult.resetTime,
         });
 
         return res.status(429).json({
           error: 'Rate limit exceeded',
           message: 'Too many requests. Please try again later.',
           retryAfter: rateLimitResult.resetTime,
-          requestId
+          requestId,
         });
       }
 
@@ -109,20 +111,20 @@ export const xDMWebhook = functions
         console.error('Invalid X DM webhook payload', {
           requestId,
           errors: validationResult.errors,
-          payload: req.body
+          payload: req.body,
         });
 
         return res.status(400).json({
           error: 'Invalid payload',
           message: 'Webhook payload validation failed',
           details: validationResult.errors,
-          requestId
+          requestId,
         });
       }
 
       // Process direct message events
       const processingResults = [];
-      
+
       for (const dmEvent of req.body.direct_message_events || []) {
         try {
           const messageProcessor = XDMProcessor.getInstance();
@@ -130,21 +132,21 @@ export const xDMWebhook = functions
             ...dmEvent,
             users: req.body.users,
             apps: req.body.apps,
-            requestId
+            requestId,
           });
-          
+
           processingResults.push(result);
         } catch (error) {
           console.error('Failed to process X DM event', {
             requestId,
             error: error.message,
-            event: dmEvent
+            event: dmEvent,
           });
-          
+
           processingResults.push({
             success: false,
             error: error.message,
-            eventId: dmEvent.id || 'unknown'
+            eventId: dmEvent.id || 'unknown',
           });
         }
       }
@@ -161,8 +163,8 @@ export const xDMWebhook = functions
         metadata: {
           eventsProcessed: processingResults.length,
           successfulEvents: processingResults.filter(r => r.success).length,
-          requestId
-        }
+          requestId,
+        },
       });
 
       // Return success response to X
@@ -170,21 +172,20 @@ export const xDMWebhook = functions
         success: true,
         eventsProcessed: processingResults.length,
         results: processingResults,
-        requestId
+        requestId,
       });
 
       console.log('X DM webhook processed successfully', {
         requestId,
         eventsProcessed: processingResults.length,
-        successfulEvents: processingResults.filter(r => r.success).length
+        successfulEvents: processingResults.filter(r => r.success).length,
       });
-
     } catch (error) {
       console.error('X DM webhook processing failed', {
         requestId,
         error: error.message,
         stack: error.stack,
-        body: req.body
+        body: req.body,
       });
 
       // Record error metrics
@@ -198,8 +199,8 @@ export const xDMWebhook = functions
         cacheHit: false,
         metadata: {
           error: error.message,
-          requestId
-        }
+          requestId,
+        },
       });
 
       // Return error response
@@ -207,7 +208,7 @@ export const xDMWebhook = functions
         success: false,
         error: 'Internal server error',
         message: 'Failed to process X DM webhook',
-        requestId
+        requestId,
       });
     }
   });
@@ -220,7 +221,7 @@ function handleCRCChallenge(req: Request, res: Response, requestId: string) {
 
   console.log('X DM webhook CRC challenge requested', {
     requestId,
-    crcToken: crcToken ? 'provided' : 'missing'
+    crcToken: crcToken ? 'provided' : 'missing',
   });
 
   if (!crcToken) {
@@ -228,7 +229,7 @@ function handleCRCChallenge(req: Request, res: Response, requestId: string) {
     return res.status(400).json({
       error: 'Bad Request',
       message: 'Missing crc_token parameter',
-      requestId
+      requestId,
     });
   }
 
@@ -244,21 +245,20 @@ function handleCRCChallenge(req: Request, res: Response, requestId: string) {
     const responseToken = 'sha256=' + hmac.digest('base64');
 
     console.log('X DM webhook CRC challenge responded successfully', { requestId });
-    
-    res.status(200).json({
-      response_token: responseToken
-    });
 
+    res.status(200).json({
+      response_token: responseToken,
+    });
   } catch (error) {
     console.error('X DM webhook CRC challenge failed', {
       requestId,
-      error: error.message
+      error: error.message,
     });
 
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to generate CRC response',
-      requestId
+      requestId,
     });
   }
 }
@@ -271,7 +271,7 @@ export const xDMWebhookHealth = functions
   .region(webhookConfig.region)
   .runWith({
     timeoutSeconds: 30,
-    memory: '256MB'
+    memory: '256MB',
   })
   .https.onRequest(async (req: Request, res: Response) => {
     try {
@@ -280,7 +280,7 @@ export const xDMWebhookHealth = functions
 
       // Check X API health
       const xApiHealth = await xApiService.checkHealth();
-      
+
       // Check message processor health
       const processorHealth = await messageProcessor.checkHealth();
 
@@ -293,24 +293,27 @@ export const xDMWebhookHealth = functions
         timestamp: new Date().toISOString(),
         services: {
           xApi: xApiHealth,
-          messageProcessor: processorHealth
+          messageProcessor: processorHealth,
         },
         metrics: {
           recentRequests: recentMetrics.length,
-          averageResponseTime: recentMetrics.length > 0 
-            ? recentMetrics.reduce((sum, m) => sum + m.responseTime, 0) / recentMetrics.length 
-            : 0,
-          successRate: recentMetrics.length > 0 
-            ? recentMetrics.filter(m => m.statusCode < 400).length / recentMetrics.length 
-            : 1
+          averageResponseTime:
+            recentMetrics.length > 0
+              ? recentMetrics.reduce((sum, m) => sum + m.responseTime, 0) / recentMetrics.length
+              : 0,
+          successRate:
+            recentMetrics.length > 0
+              ? recentMetrics.filter(m => m.statusCode < 400).length / recentMetrics.length
+              : 1,
         },
         placeholder: {
           implemented: false,
           readyForDevelopment: true,
           estimatedEffort: '3-4 weeks',
           dependencies: ['X Developer Account', 'X API v2 Access', 'Premium/Enterprise API Access'],
-          notes: 'Requires X API Premium or Enterprise access for DM functionality. Free tier has limited DM capabilities.'
-        }
+          notes:
+            'Requires X API Premium or Enterprise access for DM functionality. Free tier has limited DM capabilities.',
+        },
       };
 
       // Determine overall health status
@@ -328,11 +331,10 @@ export const xDMWebhookHealth = functions
 
       const statusCode = healthStatus.status === 'healthy' ? 200 : 503;
       res.status(statusCode).json(healthStatus);
-
     } catch (error) {
       console.error('X DM webhook health check failed', {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
 
       res.status(500).json({
@@ -341,9 +343,8 @@ export const xDMWebhookHealth = functions
         error: error.message,
         placeholder: {
           implemented: false,
-          readyForDevelopment: true
-        }
+          readyForDevelopment: true,
+        },
       });
     }
   });
-

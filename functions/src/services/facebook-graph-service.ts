@@ -1,13 +1,14 @@
 /**
  * Facebook Graph API Service for Fylgja
  * Handles Facebook Graph API interactions for Messenger integration
- * 
+ *
  * PLACEHOLDER IMPLEMENTATION - Ready for development
  */
 
 import * as crypto from 'crypto';
-import { FylgjaError, ErrorType } from '../utils/error-handler';
+
 import { RedisCacheService } from '../cache/redis-cache-service';
+import { FylgjaError, ErrorType } from '../utils/error-handler';
 
 export interface FacebookMessageRequest {
   recipientId: string;
@@ -73,8 +74,8 @@ export class FacebookGraphService {
         context: {
           hasPageAccessToken: !!pageAccessToken,
           hasAppSecret: !!appSecret,
-          hasVerifyToken: !!verifyToken
-        }
+          hasVerifyToken: !!verifyToken,
+        },
       });
     }
 
@@ -82,7 +83,7 @@ export class FacebookGraphService {
       pageAccessToken,
       appSecret,
       verifyToken,
-      apiVersion
+      apiVersion,
     };
   }
 
@@ -94,14 +95,14 @@ export class FacebookGraphService {
       console.log('Sending Facebook Messenger message (PLACEHOLDER)', {
         recipientId: request.recipientId,
         messageLength: request.message.length,
-        requestId: request.requestId
+        requestId: request.requestId,
       });
 
       // PLACEHOLDER: Implement actual Facebook Graph API call
       const messageData = {
         recipient: { id: request.recipientId },
         message: { text: request.message },
-        messaging_type: 'RESPONSE'
+        messaging_type: 'RESPONSE',
       };
 
       const response = await this.makeGraphAPICall('POST', '/me/messages', messageData);
@@ -109,22 +110,21 @@ export class FacebookGraphService {
       const result: FacebookMessageResponse = {
         messageId: response.message_id || `placeholder-${Date.now()}`,
         recipientId: request.recipientId,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       console.log('Facebook Messenger message sent successfully (PLACEHOLDER)', {
         messageId: result.messageId,
         recipientId: result.recipientId,
-        requestId: request.requestId
+        requestId: request.requestId,
       });
 
       return result;
-
     } catch (error) {
       console.error('Failed to send Facebook Messenger message', {
         recipientId: request.recipientId,
         error: error.message,
-        requestId: request.requestId
+        requestId: request.requestId,
       });
 
       throw new FylgjaError({
@@ -133,8 +133,8 @@ export class FacebookGraphService {
         context: {
           recipientId: request.recipientId,
           error: error.message,
-          requestId: request.requestId
-        }
+          requestId: request.requestId,
+        },
       });
     }
   }
@@ -149,7 +149,7 @@ export class FacebookGraphService {
       // Check cache first
       const cacheKey = `facebook_user:${userId}`;
       const cachedUser = await this.cacheService.get(cacheKey);
-      
+
       if (cachedUser) {
         console.log('Facebook user info found in cache', { userId });
         return cachedUser;
@@ -157,7 +157,7 @@ export class FacebookGraphService {
 
       // PLACEHOLDER: Implement actual Facebook Graph API call
       const userInfo = await this.makeGraphAPICall('GET', `/${userId}`, null, {
-        fields: 'first_name,last_name,profile_pic,locale,timezone,gender'
+        fields: 'first_name,last_name,profile_pic,locale,timezone,gender',
       });
 
       const result: FacebookUserInfo = {
@@ -167,7 +167,7 @@ export class FacebookGraphService {
         profile_pic: userInfo.profile_pic || '',
         locale: userInfo.locale || 'en_US',
         timezone: userInfo.timezone || 0,
-        gender: userInfo.gender
+        gender: userInfo.gender,
       };
 
       // Cache user info for 24 hours
@@ -176,15 +176,14 @@ export class FacebookGraphService {
       console.log('Facebook user info retrieved successfully (PLACEHOLDER)', {
         userId,
         firstName: result.first_name,
-        locale: result.locale
+        locale: result.locale,
       });
 
       return result;
-
     } catch (error) {
       console.error('Failed to get Facebook user info', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       // Return default user info if API call fails
@@ -194,7 +193,7 @@ export class FacebookGraphService {
         last_name: 'User',
         profile_pic: '',
         locale: 'en_US',
-        timezone: 0
+        timezone: 0,
       };
     }
   }
@@ -227,16 +226,15 @@ export class FacebookGraphService {
       if (!isValid) {
         console.warn('Invalid Facebook webhook signature', {
           provided: cleanSignature,
-          expected: expectedSignature
+          expected: expectedSignature,
         });
       }
 
       return isValid;
-
     } catch (error) {
       console.error('Error validating Facebook webhook signature', {
         error: error.message,
-        signature
+        signature,
       });
       return false;
     }
@@ -254,11 +252,11 @@ export class FacebookGraphService {
         greeting: [
           {
             locale: 'default',
-            text: 'Hello! I\'m Fylgja, your AI companion. I\'m here to help you with daily check-ins, goal tracking, and personal reflection. How can I assist you today?'
-          }
+            text: "Hello! I'm Fylgja, your AI companion. I'm here to help you with daily check-ins, goal tracking, and personal reflection. How can I assist you today?",
+          },
         ],
         get_started: {
-          payload: 'GET_STARTED'
+          payload: 'GET_STARTED',
         },
         persistent_menu: [
           {
@@ -268,36 +266,35 @@ export class FacebookGraphService {
               {
                 type: 'postback',
                 title: 'Daily Check-in',
-                payload: 'DAILY_CHECKIN'
+                payload: 'DAILY_CHECKIN',
               },
               {
                 type: 'postback',
                 title: 'View Goals',
-                payload: 'VIEW_GOALS'
+                payload: 'VIEW_GOALS',
               },
               {
                 type: 'postback',
                 title: 'Settings',
-                payload: 'SETTINGS'
-              }
-            ]
-          }
-        ]
+                payload: 'SETTINGS',
+              },
+            ],
+          },
+        ],
       };
 
       await this.makeGraphAPICall('POST', '/me/messenger_profile', profileData);
 
       console.log('Facebook Messenger profile setup completed (PLACEHOLDER)');
-
     } catch (error) {
       console.error('Failed to setup Facebook Messenger profile', {
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.CONFIGURATION_ERROR,
         message: 'Failed to setup Facebook Messenger profile',
-        context: { error: error.message }
+        context: { error: error.message },
       });
     }
   }
@@ -317,7 +314,7 @@ export class FacebookGraphService {
         method,
         endpoint,
         hasData: !!data,
-        params
+        params,
       });
 
       // Simulate API response for placeholder
@@ -333,17 +330,16 @@ export class FacebookGraphService {
           last_name: 'User',
           profile_pic: 'https://example.com/pic.jpg',
           locale: 'en_US',
-          timezone: -5
+          timezone: -5,
         };
       }
 
       return { success: true };
-
     } catch (error) {
       console.error('Facebook Graph API call failed', {
         method,
         endpoint,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
@@ -352,8 +348,8 @@ export class FacebookGraphService {
         context: {
           method,
           endpoint,
-          error: error.message
-        }
+          error: error.message,
+        },
       });
     }
   }
@@ -366,25 +362,24 @@ export class FacebookGraphService {
       console.log('Getting Facebook page info (PLACEHOLDER)');
 
       const pageInfo = await this.makeGraphAPICall('GET', '/me', null, {
-        fields: 'id,name,category,about'
+        fields: 'id,name,category,about',
       });
 
       console.log('Facebook page info retrieved successfully (PLACEHOLDER)', {
         pageId: pageInfo.id,
-        pageName: pageInfo.name
+        pageName: pageInfo.name,
       });
 
       return pageInfo;
-
     } catch (error) {
       console.error('Failed to get Facebook page info', {
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.EXTERNAL_SERVICE_ERROR,
         message: 'Failed to get Facebook page info',
-        context: { error: error.message }
+        context: { error: error.message },
       });
     }
   }
@@ -406,11 +401,10 @@ export class FacebookGraphService {
           timestamp: new Date().toISOString(),
           placeholder: {
             implemented: false,
-            readyForDevelopment: true
-          }
-        }
+            readyForDevelopment: true,
+          },
+        },
       };
-
     } catch (error) {
       return {
         healthy: false,
@@ -419,9 +413,9 @@ export class FacebookGraphService {
           timestamp: new Date().toISOString(),
           placeholder: {
             implemented: false,
-            readyForDevelopment: true
-          }
-        }
+            readyForDevelopment: true,
+          },
+        },
       };
     }
   }
@@ -436,22 +430,20 @@ export class FacebookGraphService {
       const subscriptions = await this.makeGraphAPICall('GET', '/me/subscribed_apps');
 
       console.log('Facebook webhook subscriptions retrieved (PLACEHOLDER)', {
-        subscriptions
+        subscriptions,
       });
 
       return subscriptions;
-
     } catch (error) {
       console.error('Failed to get Facebook webhook subscriptions', {
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.EXTERNAL_SERVICE_ERROR,
         message: 'Failed to get Facebook webhook subscriptions',
-        context: { error: error.message }
+        context: { error: error.message },
       });
     }
   }
 }
-

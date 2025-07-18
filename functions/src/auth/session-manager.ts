@@ -4,12 +4,14 @@
  * security monitoring, and performance optimization
  */
 
-import { AuthSession, AuthContext, DeviceInfo } from './authentication-service';
-import { EnhancedDatabaseService } from '../services/enhanced-database-service';
-import { performanceMonitor } from '../utils/monitoring';
-import { FylgjaError, createAuthError, createSystemError } from '../utils/error-handler';
-import { cacheService } from '../cache/redis-cache-service';
 import * as crypto from 'crypto';
+
+import { cacheService } from '../cache/redis-cache-service';
+import { EnhancedDatabaseService } from '../services/enhanced-database-service';
+import { FylgjaError, createAuthError, createSystemError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
+
+import { AuthSession, AuthContext, DeviceInfo } from './authentication-service';
 
 export interface SessionMetrics {
   sessionId: string;
@@ -37,7 +39,13 @@ export interface SessionSecurity {
 }
 
 export interface SecurityEvent {
-  type: 'ip_change' | 'user_agent_change' | 'geo_change' | 'device_change' | 'suspicious_request' | 'rate_limit_exceeded';
+  type:
+    | 'ip_change'
+    | 'user_agent_change'
+    | 'geo_change'
+    | 'device_change'
+    | 'suspicious_request'
+    | 'rate_limit_exceeded';
   timestamp: string;
   details: Record<string, any>;
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -100,11 +108,11 @@ export interface SessionTransferRequest {
 
 export class SessionManager {
   private database: EnhancedDatabaseService;
-  
+
   private readonly SESSION_CACHE_TTL = 1800000; // 30 minutes
   private readonly METRICS_CACHE_TTL = 300000; // 5 minutes
   private readonly SECURITY_CACHE_TTL = 600000; // 10 minutes
-  
+
   private readonly DEFAULT_CLEANUP_POLICY: SessionCleanupPolicy = {
     maxInactiveDuration: 1800000, // 30 minutes
     maxSessionDuration: 86400000, // 24 hours
@@ -115,54 +123,71 @@ export class SessionManager {
   };
 
   private readonly PLATFORM_CONFIGS: Map<string, PlatformSessionConfig> = new Map([
-    ['whatsapp', {
-      platform: 'whatsapp',
-      sessionTimeout: 60, // 1 hour
-      maxConcurrentSessions: 3,
-      requiresDeviceVerification: false,
-      allowsSessionExtension: true,
-      securityLevel: 'medium',
-      rateLimits: [
-        { action: 'message', maxRequests: 100, windowSize: 3600000, blockDuration: 300000 },
-        { action: 'api_call', maxRequests: 1000, windowSize: 3600000, blockDuration: 600000 },
-      ],
-    }],
-    ['web', {
-      platform: 'web',
-      sessionTimeout: 30, // 30 minutes
-      maxConcurrentSessions: 5,
-      requiresDeviceVerification: true,
-      allowsSessionExtension: true,
-      securityLevel: 'high',
-      rateLimits: [
-        { action: 'login', maxRequests: 5, windowSize: 900000, blockDuration: 900000 },
-        { action: 'api_call', maxRequests: 2000, windowSize: 3600000, blockDuration: 300000 },
-      ],
-    }],
-    ['google_home', {
-      platform: 'google_home',
-      sessionTimeout: 120, // 2 hours
-      maxConcurrentSessions: 2,
-      requiresDeviceVerification: true,
-      allowsSessionExtension: false,
-      securityLevel: 'medium',
-      rateLimits: [
-        { action: 'voice_command', maxRequests: 200, windowSize: 3600000, blockDuration: 300000 },
-        { action: 'api_call', maxRequests: 500, windowSize: 3600000, blockDuration: 600000 },
-      ],
-    }],
-    ['api', {
-      platform: 'api',
-      sessionTimeout: 240, // 4 hours
-      maxConcurrentSessions: 10,
-      requiresDeviceVerification: false,
-      allowsSessionExtension: true,
-      securityLevel: 'low',
-      rateLimits: [
-        { action: 'api_call', maxRequests: 10000, windowSize: 3600000, blockDuration: 300000 },
-        { action: 'bulk_operation', maxRequests: 100, windowSize: 3600000, blockDuration: 1800000 },
-      ],
-    }],
+    [
+      'whatsapp',
+      {
+        platform: 'whatsapp',
+        sessionTimeout: 60, // 1 hour
+        maxConcurrentSessions: 3,
+        requiresDeviceVerification: false,
+        allowsSessionExtension: true,
+        securityLevel: 'medium',
+        rateLimits: [
+          { action: 'message', maxRequests: 100, windowSize: 3600000, blockDuration: 300000 },
+          { action: 'api_call', maxRequests: 1000, windowSize: 3600000, blockDuration: 600000 },
+        ],
+      },
+    ],
+    [
+      'web',
+      {
+        platform: 'web',
+        sessionTimeout: 30, // 30 minutes
+        maxConcurrentSessions: 5,
+        requiresDeviceVerification: true,
+        allowsSessionExtension: true,
+        securityLevel: 'high',
+        rateLimits: [
+          { action: 'login', maxRequests: 5, windowSize: 900000, blockDuration: 900000 },
+          { action: 'api_call', maxRequests: 2000, windowSize: 3600000, blockDuration: 300000 },
+        ],
+      },
+    ],
+    [
+      'google_home',
+      {
+        platform: 'google_home',
+        sessionTimeout: 120, // 2 hours
+        maxConcurrentSessions: 2,
+        requiresDeviceVerification: true,
+        allowsSessionExtension: false,
+        securityLevel: 'medium',
+        rateLimits: [
+          { action: 'voice_command', maxRequests: 200, windowSize: 3600000, blockDuration: 300000 },
+          { action: 'api_call', maxRequests: 500, windowSize: 3600000, blockDuration: 600000 },
+        ],
+      },
+    ],
+    [
+      'api',
+      {
+        platform: 'api',
+        sessionTimeout: 240, // 4 hours
+        maxConcurrentSessions: 10,
+        requiresDeviceVerification: false,
+        allowsSessionExtension: true,
+        securityLevel: 'low',
+        rateLimits: [
+          { action: 'api_call', maxRequests: 10000, windowSize: 3600000, blockDuration: 300000 },
+          {
+            action: 'bulk_operation',
+            maxRequests: 100,
+            windowSize: 3600000,
+            blockDuration: 1800000,
+          },
+        ],
+      },
+    ],
   ]);
 
   constructor() {
@@ -193,7 +218,7 @@ export class SessionManager {
 
       // Generate session
       const sessionId = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + (config.sessionTimeout * 60 * 1000));
+      const expiresAt = new Date(Date.now() + config.sessionTimeout * 60 * 1000);
 
       const session: AuthSession = {
         sessionId,
@@ -231,7 +256,6 @@ export class SessionManager {
 
       performanceMonitor.endTimer(timerId);
       return session;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to create session: ${error.message}`);
@@ -241,7 +265,7 @@ export class SessionManager {
   /**
    * Validate session and update activity
    */
-  async validateSession(sessionId: string, updateActivity: boolean = true): Promise<AuthSession> {
+  async validateSession(sessionId: string, updateActivity = true): Promise<AuthSession> {
     const timerId = performanceMonitor.startTimer('validate_session');
 
     try {
@@ -272,7 +296,6 @@ export class SessionManager {
 
       performanceMonitor.endTimer(timerId);
       return session;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Session validation failed: ${error.message}`);
@@ -292,7 +315,7 @@ export class SessionManager {
       }
 
       const config = this.PLATFORM_CONFIGS.get(session.platform);
-      if (!config || !config.allowsSessionExtension) {
+      if (!config?.allowsSessionExtension) {
         throw createAuthError('Session extension not allowed for this platform');
       }
 
@@ -328,7 +351,6 @@ export class SessionManager {
 
       performanceMonitor.endTimer(timerId);
       return updatedSession;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to extend session: ${error.message}`);
@@ -374,15 +396,19 @@ export class SessionManager {
       await this.deactivateSession(request.fromSessionId, 'transferred');
 
       // Log transfer
-      await this.logSessionActivity(newSession.sessionId, 'session_transferred', request.toPlatform, {
-        fromPlatform: originalSession.platform,
-        fromSessionId: request.fromSessionId,
-        transferTime: new Date().toISOString(),
-      });
+      await this.logSessionActivity(
+        newSession.sessionId,
+        'session_transferred',
+        request.toPlatform,
+        {
+          fromPlatform: originalSession.platform,
+          fromSessionId: request.fromSessionId,
+          transferTime: new Date().toISOString(),
+        }
+      );
 
       performanceMonitor.endTimer(timerId);
       return newSession;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to transfer session: ${error.message}`);
@@ -413,7 +439,6 @@ export class SessionManager {
 
       performanceMonitor.endTimer(timerId);
       return metrics;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Failed to get session metrics: ${error.message}`);
@@ -444,7 +469,6 @@ export class SessionManager {
 
       performanceMonitor.endTimer(timerId);
       return security;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Failed to get session security: ${error.message}`);
@@ -473,7 +497,6 @@ export class SessionManager {
 
       performanceMonitor.endTimer(timerId);
       return result.documents;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Failed to get user sessions: ${error.message}`);
@@ -483,7 +506,7 @@ export class SessionManager {
   /**
    * Deactivate session
    */
-  async deactivateSession(sessionId: string, reason: string = 'manual'): Promise<void> {
+  async deactivateSession(sessionId: string, reason = 'manual'): Promise<void> {
     const timerId = performanceMonitor.startTimer('deactivate_session');
 
     try {
@@ -515,7 +538,6 @@ export class SessionManager {
       });
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Failed to deactivate session: ${error.message}`);
@@ -538,7 +560,6 @@ export class SessionManager {
       }
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Failed to deactivate all user sessions: ${error.message}`);
@@ -569,7 +590,7 @@ export class SessionManager {
 
       // Check current usage
       const rateLimitKey = `rate_limit_${sessionId}_${action}`;
-      const currentCount = await cacheService.get(rateLimitKey) || 0;
+      const currentCount = (await cacheService.get(rateLimitKey)) || 0;
 
       if (currentCount >= rateLimit.maxRequests) {
         // Rate limit exceeded
@@ -590,7 +611,6 @@ export class SessionManager {
 
       performanceMonitor.endTimer(timerId);
       return true;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Failed to check rate limit: ${error.message}`);
@@ -629,7 +649,6 @@ export class SessionManager {
       await this.updateSessionMetrics(sessionId, activity);
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       console.warn('Failed to record session activity:', error);
@@ -651,13 +670,12 @@ export class SessionManager {
     // Get from database
     try {
       const session = await this.database.getDocument('auth_sessions', sessionId);
-      
+
       if (session) {
         await this.cacheSession(session);
       }
 
       return session;
-
     } catch (error) {
       return null;
     }
@@ -677,8 +695,8 @@ export class SessionManager {
 
     if (activeSessions.length >= maxConcurrentSessions) {
       // Deactivate oldest session
-      const oldestSession = activeSessions.sort((a, b) => 
-        new Date(a.lastActivity).getTime() - new Date(b.lastActivity).getTime()
+      const oldestSession = activeSessions.sort(
+        (a, b) => new Date(a.lastActivity).getTime() - new Date(b.lastActivity).getTime()
       )[0];
 
       await this.deactivateSession(oldestSession.sessionId, 'session_limit_exceeded');
@@ -695,9 +713,13 @@ export class SessionManager {
     // Update cache
     const cacheKey = `session_${sessionId}`;
     const cachedSession = await cacheService.get(cacheKey);
-    
+
     if (cachedSession) {
-      await cacheService.set(cacheKey, { ...cachedSession, ...updates }, { ttl: this.SESSION_CACHE_TTL });
+      await cacheService.set(
+        cacheKey,
+        { ...cachedSession, ...updates },
+        { ttl: this.SESSION_CACHE_TTL }
+      );
     }
   }
 
@@ -742,26 +764,30 @@ export class SessionManager {
     }
 
     // Get activities
-    const activities = await this.database.queryDocuments('session_activities', [
-      { field: 'sessionId', operator: '==', value: sessionId },
-    ], {
-      orderBy: [{ field: 'timestamp', direction: 'asc' }],
-    });
+    const activities = await this.database.queryDocuments(
+      'session_activities',
+      [{ field: 'sessionId', operator: '==', value: sessionId }],
+      {
+        orderBy: [{ field: 'timestamp', direction: 'asc' }],
+      }
+    );
 
     // Calculate metrics
     const duration = Date.now() - new Date(session.createdAt).getTime();
     const activityCount = activities.documents.length;
-    const dataTransferred = activities.documents.reduce((sum, activity) => 
-      sum + (activity.requestSize || 0) + (activity.responseSize || 0), 0
+    const dataTransferred = activities.documents.reduce(
+      (sum, activity) => sum + (activity.requestSize || 0) + (activity.responseSize || 0),
+      0
     );
     const requestCount = activities.documents.length;
     const errorCount = activities.documents.filter(activity => !activity.success).length;
     const responseTimes = activities.documents
       .filter(activity => activity.responseTime)
       .map(activity => activity.responseTime);
-    const averageResponseTime = responseTimes.length > 0 
-      ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length 
-      : 0;
+    const averageResponseTime =
+      responseTimes.length > 0
+        ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length
+        : 0;
 
     return {
       sessionId,
@@ -781,7 +807,7 @@ export class SessionManager {
   private async calculateSessionSecurity(sessionId: string): Promise<SessionSecurity> {
     // Get existing security record
     const existingSecurity = await this.database.getDocument('session_security', sessionId);
-    
+
     if (existingSecurity) {
       return existingSecurity;
     }
@@ -801,7 +827,7 @@ export class SessionManager {
 
   private async checkSessionSecurity(sessionId: string): Promise<void> {
     const security = await this.getSessionSecurity(sessionId);
-    
+
     // Check for high risk score
     if (security.riskScore > 0.7) {
       await this.deactivateSession(sessionId, 'high_security_risk');
@@ -809,8 +835,8 @@ export class SessionManager {
     }
 
     // Check for critical security events
-    const criticalEvents = security.securityEvents.filter(event => 
-      event.severity === 'critical' && !event.resolved
+    const criticalEvents = security.securityEvents.filter(
+      event => event.severity === 'critical' && !event.resolved
     );
 
     if (criticalEvents.length > 0) {
@@ -821,9 +847,9 @@ export class SessionManager {
 
   private async recordSecurityEvent(sessionId: string, event: SecurityEvent): Promise<void> {
     const security = await this.getSessionSecurity(sessionId);
-    
+
     security.securityEvents.push(event);
-    
+
     // Update risk score based on event
     switch (event.severity) {
       case 'low':
@@ -853,18 +879,19 @@ export class SessionManager {
 
   private async updateSessionMetrics(sessionId: string, activity: SessionActivity): Promise<void> {
     const metrics = await this.getSessionMetrics(sessionId);
-    
+
     metrics.activityCount += 1;
     metrics.requestCount += 1;
     metrics.lastActivity = activity.timestamp;
-    
+
     if (!activity.success) {
       metrics.errorCount += 1;
     }
 
     if (activity.responseTime) {
       const totalResponseTime = metrics.averageResponseTime * (metrics.requestCount - 1);
-      metrics.averageResponseTime = (totalResponseTime + activity.responseTime) / metrics.requestCount;
+      metrics.averageResponseTime =
+        (totalResponseTime + activity.responseTime) / metrics.requestCount;
     }
 
     if (activity.requestSize) {
@@ -886,7 +913,7 @@ export class SessionManager {
   private async archiveSessionMetrics(sessionId: string): Promise<void> {
     try {
       const metrics = await this.getSessionMetrics(sessionId);
-      
+
       // Move to archived metrics collection
       await this.database.addDocument('archived_session_metrics', {
         ...metrics,
@@ -895,7 +922,6 @@ export class SessionManager {
 
       // Remove from active metrics
       await this.database.deleteDocument('session_metrics', sessionId);
-
     } catch (error) {
       console.warn('Failed to archive session metrics:', error);
     }
@@ -922,7 +948,7 @@ export class SessionManager {
   private async verifyTransferCode(uid: string, code: string): Promise<boolean> {
     const cacheKey = `transfer_code_${uid}`;
     const storedCode = await cacheService.get(cacheKey);
-    
+
     return storedCode === code;
   }
 
@@ -932,12 +958,14 @@ export class SessionManager {
   ): Promise<void> {
     // Transfer relevant session data
     // This could include user preferences, temporary data, etc.
-    console.log(`Transferring session data from ${fromSession.sessionId} to ${toSession.sessionId}`);
+    console.log(
+      `Transferring session data from ${fromSession.sessionId} to ${toSession.sessionId}`
+    );
   }
 
   private getDefaultPermissions(platform: string): string[] {
     const basePermissions = ['read_profile', 'update_profile'];
-    
+
     switch (platform) {
       case 'whatsapp':
         return [...basePermissions, 'send_messages', 'receive_messages'];
@@ -976,7 +1004,6 @@ export class SessionManager {
       }
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       console.error('Failed to cleanup expired sessions:', error);
@@ -986,4 +1013,3 @@ export class SessionManager {
 
 // Global session manager instance
 export const sessionManager = new SessionManager();
-

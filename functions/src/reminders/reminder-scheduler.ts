@@ -3,11 +3,12 @@
  * Handles scheduling, delivery, and integration with various messaging platforms
  */
 
-import { ReminderSystem, Reminder, DeliveryChannel } from './reminder-system';
+import { RedisCacheService } from '../cache/redis-cache-service';
 import { EnhancedDatabaseService } from '../services/enhanced-database-service';
 import { TwilioService } from '../services/twilio-service';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
-import { RedisCacheService } from '../cache/redis-cache-service';
+
+import { ReminderSystem, Reminder, DeliveryChannel } from './reminder-system';
 
 export interface ScheduledJob {
   id: string;
@@ -52,7 +53,7 @@ export class ReminderScheduler {
   private databaseService: EnhancedDatabaseService;
   private twilioService: TwilioService;
   private cacheService: RedisCacheService;
-  private isProcessing: boolean = false;
+  private isProcessing = false;
 
   private constructor() {
     this.reminderSystem = ReminderSystem.getInstance();
@@ -76,7 +77,7 @@ export class ReminderScheduler {
       console.log('Scheduling reminder', {
         reminderId: reminder.id,
         scheduledTime: reminder.scheduledTime,
-        userId: reminder.userId
+        userId: reminder.userId,
       });
 
       // Create scheduled job
@@ -91,10 +92,10 @@ export class ReminderScheduler {
         maxAttempts: 3,
         metadata: {
           priority: reminder.priority,
-          channels: reminder.delivery.channels.map(c => c.type)
+          channels: reminder.delivery.channels.map(c => c.type),
         },
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       // Store job in database
@@ -112,21 +113,20 @@ export class ReminderScheduler {
 
       console.log('Reminder scheduled successfully', {
         jobId: job.id,
-        reminderId: reminder.id
+        reminderId: reminder.id,
       });
 
       return job;
-
     } catch (error) {
       console.error('Failed to schedule reminder', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to schedule reminder',
-        context: { reminderId: reminder.id, error: error.message }
+        context: { reminderId: reminder.id, error: error.message },
       });
     }
   }
@@ -145,7 +145,7 @@ export class ReminderScheduler {
         if (job.status === 'pending') {
           await this.databaseService.updateScheduledJob(job.id, {
             status: 'cancelled',
-            updatedAt: new Date()
+            updatedAt: new Date(),
           });
 
           // Remove from processing queue
@@ -155,19 +155,18 @@ export class ReminderScheduler {
 
       console.log('Scheduled reminder cancelled', {
         reminderId,
-        cancelledJobs: jobs.length
+        cancelledJobs: jobs.length,
       });
-
     } catch (error) {
       console.error('Failed to cancel scheduled reminder', {
         reminderId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to cancel scheduled reminder',
-        context: { reminderId, error: error.message }
+        context: { reminderId, error: error.message },
       });
     }
   }
@@ -198,14 +197,13 @@ export class ReminderScheduler {
       }
 
       console.log('Completed due reminder processing');
-
     } catch (error) {
       console.error('Failed to process due reminders', { error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to process due reminders',
-        context: { error: error.message }
+        context: { error: error.message },
       });
     } finally {
       this.isProcessing = false;
@@ -222,7 +220,7 @@ export class ReminderScheduler {
     try {
       console.log('Delivering reminder', {
         reminderId: reminder.id,
-        channels: reminder.delivery.channels.length
+        channels: reminder.delivery.channels.length,
       });
 
       // Generate personalized message
@@ -247,7 +245,7 @@ export class ReminderScheduler {
         results,
         overallSuccess: successfulDeliveries > 0,
         deliveryStartTime,
-        deliveryEndTime
+        deliveryEndTime,
       };
 
       // Store delivery report
@@ -259,21 +257,20 @@ export class ReminderScheduler {
       console.log('Reminder delivery completed', {
         reminderId: reminder.id,
         successfulDeliveries,
-        totalChannels: report.totalChannels
+        totalChannels: report.totalChannels,
       });
 
       return report;
-
     } catch (error) {
       console.error('Failed to deliver reminder', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to deliver reminder',
-        context: { reminderId: reminder.id, error: error.message }
+        context: { reminderId: reminder.id, error: error.message },
       });
     }
   }
@@ -290,7 +287,7 @@ export class ReminderScheduler {
         throw new FylgjaError({
           type: ErrorType.NOT_FOUND,
           message: 'Scheduled job not found',
-          context: { jobId }
+          context: { jobId },
         });
       }
 
@@ -305,21 +302,20 @@ export class ReminderScheduler {
         attempts: job.attempts + 1,
         lastAttempt: new Date(),
         nextRetry: this.calculateNextRetry(job.attempts + 1),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       // Process the job
       await this.processScheduledJob(job);
 
       console.log('Retry completed', { jobId });
-
     } catch (error) {
       console.error('Failed to retry delivery', { jobId, error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to retry delivery',
-        context: { jobId, error: error.message }
+        context: { jobId, error: error.message },
       });
     }
   }
@@ -340,22 +336,22 @@ export class ReminderScheduler {
         totalReminders: stats.totalReminders,
         successfulDeliveries: stats.successfulDeliveries,
         failedDeliveries: stats.failedDeliveries,
-        deliveryRate: stats.totalReminders > 0 ? stats.successfulDeliveries / stats.totalReminders : 0,
+        deliveryRate:
+          stats.totalReminders > 0 ? stats.successfulDeliveries / stats.totalReminders : 0,
         channelBreakdown: stats.channelBreakdown,
         averageDeliveryTime: stats.averageDeliveryTime,
-        peakDeliveryHours: stats.peakDeliveryHours
+        peakDeliveryHours: stats.peakDeliveryHours,
       };
-
     } catch (error) {
       console.error('Failed to get delivery statistics', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to get delivery statistics',
-        context: { userId, error: error.message }
+        context: { userId, error: error.message },
       });
     }
   }
@@ -368,7 +364,7 @@ export class ReminderScheduler {
     try {
       for (const notification of reminder.delivery.advanceNotifications) {
         const notificationTime = new Date(
-          reminder.scheduledTime.getTime() - (notification.timeBeforeReminder * 60 * 1000)
+          reminder.scheduledTime.getTime() - notification.timeBeforeReminder * 60 * 1000
         );
 
         // Only schedule if notification time is in the future
@@ -385,20 +381,19 @@ export class ReminderScheduler {
             metadata: {
               timeBeforeReminder: notification.timeBeforeReminder,
               message: notification.message,
-              channels: notification.channels
+              channels: notification.channels,
             },
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
           };
 
           await this.databaseService.storeScheduledJob(job);
         }
       }
-
     } catch (error) {
       console.warn('Failed to schedule advance notifications', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -414,11 +409,10 @@ export class ReminderScheduler {
       // Add to Redis queue for immediate processing
       const queueKey = 'reminder_processing_queue';
       await this.cacheService.lpush(queueKey, JSON.stringify(job));
-
     } catch (error) {
       console.warn('Failed to add job to processing queue', {
         jobId: job.id,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -439,11 +433,10 @@ export class ReminderScheduler {
           }
         }
       }
-
     } catch (error) {
       console.warn('Failed to remove job from processing queue', {
         jobId,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -453,14 +446,14 @@ export class ReminderScheduler {
       console.log('Processing scheduled job', {
         jobId: job.id,
         jobType: job.jobType,
-        reminderId: job.reminderId
+        reminderId: job.reminderId,
       });
 
       // Update job status
       await this.databaseService.updateScheduledJob(job.id, {
         status: 'processing',
         lastAttempt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       // Get reminder details
@@ -487,15 +480,14 @@ export class ReminderScheduler {
       // Mark job as completed
       await this.databaseService.updateScheduledJob(job.id, {
         status: 'completed',
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       console.log('Scheduled job completed successfully', { jobId: job.id });
-
     } catch (error) {
       console.error('Failed to process scheduled job', {
         jobId: job.id,
-        error: error.message
+        error: error.message,
       });
 
       // Update job with error
@@ -503,14 +495,17 @@ export class ReminderScheduler {
         status: 'failed',
         errorMessage: error.message,
         nextRetry: this.calculateNextRetry(job.attempts + 1),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       // Schedule retry if attempts remaining
       if (job.attempts < job.maxAttempts) {
-        setTimeout(() => {
-          this.retryFailedDelivery(job.id).catch(console.error);
-        }, this.getRetryDelay(job.attempts + 1));
+        setTimeout(
+          () => {
+            this.retryFailedDelivery(job.id).catch(console.error);
+          },
+          this.getRetryDelay(job.attempts + 1)
+        );
       }
     }
   }
@@ -543,21 +538,21 @@ export class ReminderScheduler {
         health: '🏥',
         social: '👥',
         learning: '📚',
-        custom: '📌'
+        custom: '📌',
       };
 
       const emoji = categoryEmojis[reminder.category] || '📌';
       message = `${emoji} ${message}`;
 
       // Add helpful actions
-      message += '\n\nReply with:\n• "Done" to mark complete\n• "Snooze 30m" to postpone\n• "Cancel" to remove';
+      message +=
+        '\n\nReply with:\n• "Done" to mark complete\n• "Snooze 30m" to postpone\n• "Cancel" to remove';
 
       return message;
-
     } catch (error) {
       console.warn('Failed to generate reminder message', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
 
       // Fallback to simple message
@@ -576,7 +571,7 @@ export class ReminderScheduler {
       console.log('Delivering through channel', {
         reminderId: reminder.id,
         channelType: channel.type,
-        address: channel.address
+        address: channel.address,
       });
 
       let messageId: string | undefined;
@@ -611,16 +606,15 @@ export class ReminderScheduler {
         success: true,
         messageId,
         deliveredAt: new Date(),
-        responseTime
+        responseTime,
       };
-
     } catch (error) {
       const responseTime = Date.now() - startTime;
 
       console.error('Failed to deliver through channel', {
         reminderId: reminder.id,
         channelType: channel.type,
-        error: error.message
+        error: error.message,
       });
 
       return {
@@ -628,7 +622,7 @@ export class ReminderScheduler {
         success: false,
         errorMessage: error.message,
         deliveredAt: new Date(),
-        responseTime
+        responseTime,
       };
     }
   }
@@ -661,10 +655,18 @@ export class ReminderScheduler {
     }
   }
 
-  private async deliverPushNotification(deviceId: string, title: string, message: string): Promise<string> {
+  private async deliverPushNotification(
+    deviceId: string,
+    title: string,
+    message: string
+  ): Promise<string> {
     try {
       // Implementation would integrate with Firebase Cloud Messaging
-      console.log('Push notification delivery', { deviceId, title, message: message.substring(0, 100) });
+      console.log('Push notification delivery', {
+        deviceId,
+        title,
+        message: message.substring(0, 100),
+      });
       return `push-${Date.now()}`;
     } catch (error) {
       throw new Error(`Push notification delivery failed: ${error.message}`);
@@ -681,10 +683,18 @@ export class ReminderScheduler {
     }
   }
 
-  private async deliverSmartDisplay(deviceId: string, title: string, message: string): Promise<string> {
+  private async deliverSmartDisplay(
+    deviceId: string,
+    title: string,
+    message: string
+  ): Promise<string> {
     try {
       // Implementation would integrate with Google Assistant SDK
-      console.log('Smart display delivery', { deviceId, title, message: message.substring(0, 100) });
+      console.log('Smart display delivery', {
+        deviceId,
+        title,
+        message: message.substring(0, 100),
+      });
       return `display-${Date.now()}`;
     } catch (error) {
       throw new Error(`Smart display delivery failed: ${error.message}`);
@@ -693,7 +703,8 @@ export class ReminderScheduler {
 
   private async deliverAdvanceNotification(reminder: Reminder, job: ScheduledJob): Promise<void> {
     try {
-      const notificationMessage = job.metadata.message || 
+      const notificationMessage =
+        job.metadata.message ||
         `⏰ Upcoming reminder in ${job.metadata.timeBeforeReminder} minutes: ${reminder.title}`;
 
       // Deliver through specified channels or default channels
@@ -701,16 +712,15 @@ export class ReminderScheduler {
 
       for (const channelType of channels) {
         const channel = reminder.delivery.channels.find(c => c.type === channelType);
-        if (channel && channel.enabled) {
+        if (channel?.enabled) {
           await this.deliverThroughChannel(reminder, channel, notificationMessage);
         }
       }
-
     } catch (error) {
       console.error('Failed to deliver advance notification', {
         jobId: job.id,
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
 
       throw error;
@@ -724,15 +734,14 @@ export class ReminderScheduler {
         // This would be handled by the main reminder system
         console.log('Processing recurring check', {
           reminderId: reminder.id,
-          recurrenceType: reminder.recurrence.type
+          recurrenceType: reminder.recurrence.type,
         });
       }
-
     } catch (error) {
       console.error('Failed to process recurring check', {
         jobId: job.id,
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
 
       throw error;
@@ -762,18 +771,16 @@ export class ReminderScheduler {
         metadata: {
           priority: reminder.priority,
           category: reminder.category,
-          channelTypes: reminder.delivery.channels.map(c => c.type)
-        }
+          channelTypes: reminder.delivery.channels.map(c => c.type),
+        },
       };
 
       await this.databaseService.storeDeliveryAnalytics(analytics);
-
     } catch (error) {
       console.warn('Failed to track delivery analytics', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
     }
   }
 }
-

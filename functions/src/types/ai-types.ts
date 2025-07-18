@@ -13,10 +13,10 @@ export interface AIRequest {
   preferences?: UserAIPreferences;
 }
 
-export type AIRequestType = 
-  | 'checkin' 
-  | 'task_analysis' 
-  | 'response_generation' 
+export type AIRequestType =
+  | 'checkin'
+  | 'task_analysis'
+  | 'response_generation'
   | 'sentiment_analysis'
   | 'question_generation'
   | 'goal_setting'
@@ -307,7 +307,7 @@ export type AIServiceStatus = 'healthy' | 'degraded' | 'unavailable';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-export type AICapability = 
+export type AICapability =
   | 'text_generation'
   | 'sentiment_analysis'
   | 'task_extraction'
@@ -318,7 +318,12 @@ export type AICapability =
 
 // Event types for AI service
 export interface AIServiceEvent {
-  type: 'request_started' | 'request_completed' | 'request_failed' | 'rate_limit_hit' | 'quota_warning';
+  type:
+    | 'request_started'
+    | 'request_completed'
+    | 'request_failed'
+    | 'rate_limit_hit'
+    | 'quota_warning';
   timestamp: string;
   userId: string;
   requestId: string;
@@ -349,4 +354,3 @@ export interface HealthCheckResponse {
     database: 'healthy' | 'unhealthy';
   };
 }
-

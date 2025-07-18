@@ -4,7 +4,13 @@
  */
 
 import { DatabaseService } from '../services/database-service';
-import { UserPersonalityProfile, PersonalityType, QuestionCategory, QuestionDepth } from './prompt-engine';
+
+import {
+  UserPersonalityProfile,
+  PersonalityType,
+  QuestionCategory,
+  QuestionDepth,
+} from './prompt-engine';
 
 export interface LearningEvent {
   userId: string;
@@ -15,7 +21,7 @@ export interface LearningEvent {
   source: 'interaction' | 'response_analysis' | 'timing_pattern' | 'engagement_metric';
 }
 
-export type LearningEventType = 
+export type LearningEventType =
   | 'response_length_preference'
   | 'question_category_preference'
   | 'communication_style_shift'
@@ -40,7 +46,7 @@ export interface UserBehaviorPattern {
   metadata: Record<string, any>;
 }
 
-export type BehaviorPatternType = 
+export type BehaviorPatternType =
   | 'response_timing'
   | 'message_length'
   | 'emotional_expression'
@@ -62,7 +68,7 @@ export interface AdaptationRecommendation {
   validUntil: string;
 }
 
-export type AdaptationType = 
+export type AdaptationType =
   | 'question_style'
   | 'response_tone'
   | 'interaction_frequency'
@@ -84,7 +90,7 @@ export interface LearningInsight {
   createdAt: string;
 }
 
-export type InsightType = 
+export type InsightType =
   | 'personality_shift'
   | 'engagement_decline'
   | 'new_interest_area'
@@ -187,7 +193,7 @@ export class AdaptiveLearningEngine {
    * Apply adaptations to user personality profile
    */
   async applyAdaptations(
-    userId: string, 
+    userId: string,
     profile: UserPersonalityProfile,
     recommendations: AdaptationRecommendation[]
   ): Promise<UserPersonalityProfile> {
@@ -196,7 +202,7 @@ export class AdaptiveLearningEngine {
     for (const rec of recommendations) {
       if (rec.confidence >= this.ADAPTATION_CONFIDENCE_THRESHOLD) {
         updatedProfile = this.applyAdaptation(updatedProfile, rec);
-        
+
         // Record that we applied this adaptation
         await this.recordLearningEvent({
           userId,
@@ -234,13 +240,13 @@ export class AdaptiveLearningEngine {
    * Perform detailed response analysis
    */
   private performResponseAnalysis(
-    userMessage: string, 
-    questionAsked: string, 
+    userMessage: string,
+    questionAsked: string,
     responseTime: number
   ): ResponseAnalysis {
     const words = userMessage.split(/\s+/).filter(word => word.length > 0);
     const sentences = userMessage.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    
+
     return {
       length: {
         characters: userMessage.length,
@@ -290,7 +296,8 @@ export class AdaptiveLearningEngine {
     });
 
     // Communication style indicators
-    if (analysis.linguistic.formality !== 0.5) { // Not neutral
+    if (analysis.linguistic.formality !== 0.5) {
+      // Not neutral
       events.push({
         userId,
         eventType: 'formality_preference',
@@ -352,25 +359,35 @@ export class AdaptiveLearningEngine {
    */
   private async analyzePatterns(userId: string): Promise<void> {
     const events = this.learningEvents.get(userId) || [];
-    if (events.length < this.MIN_EVENTS_FOR_PATTERN) return;
+    if (events.length < this.MIN_EVENTS_FOR_PATTERN) {
+      return;
+    }
 
     const patterns: UserBehaviorPattern[] = [];
 
     // Analyze response timing patterns
     const timingPattern = this.analyzeTimingPattern(userId, events);
-    if (timingPattern) patterns.push(timingPattern);
+    if (timingPattern) {
+      patterns.push(timingPattern);
+    }
 
     // Analyze message length patterns
     const lengthPattern = this.analyzeLengthPattern(userId, events);
-    if (lengthPattern) patterns.push(lengthPattern);
+    if (lengthPattern) {
+      patterns.push(lengthPattern);
+    }
 
     // Analyze emotional expression patterns
     const emotionalPattern = this.analyzeEmotionalPattern(userId, events);
-    if (emotionalPattern) patterns.push(emotionalPattern);
+    if (emotionalPattern) {
+      patterns.push(emotionalPattern);
+    }
 
     // Analyze topic engagement patterns
     const topicPattern = this.analyzeTopicPattern(userId, events);
-    if (topicPattern) patterns.push(topicPattern);
+    if (topicPattern) {
+      patterns.push(topicPattern);
+    }
 
     // Store patterns
     this.behaviorPatterns.set(userId, patterns);
@@ -387,7 +404,7 @@ export class AdaptiveLearningEngine {
   private async generateAdaptationRecommendations(userId: string): Promise<void> {
     const patterns = this.behaviorPatterns.get(userId) || [];
     const events = this.learningEvents.get(userId) || [];
-    
+
     const recommendations: AdaptationRecommendation[] = [];
 
     // Analyze each pattern for adaptation opportunities
@@ -398,7 +415,9 @@ export class AdaptiveLearningEngine {
 
     // Sort by priority and confidence
     recommendations.sort((a, b) => {
-      if (a.priority !== b.priority) return b.priority - a.priority;
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority;
+      }
       return b.confidence - a.confidence;
     });
 
@@ -419,13 +438,15 @@ export class AdaptiveLearningEngine {
   private async generateLearningInsights(userId: string): Promise<void> {
     const patterns = this.behaviorPatterns.get(userId) || [];
     const events = this.learningEvents.get(userId) || [];
-    
+
     const insights: LearningInsight[] = [];
 
     // Generate insights from patterns
     for (const pattern of patterns) {
       const insight = this.generateInsightFromPattern(userId, pattern, events);
-      if (insight) insights.push(insight);
+      if (insight) {
+        insights.push(insight);
+      }
     }
 
     // Generate insights from event trends
@@ -493,14 +514,22 @@ export class AdaptiveLearningEngine {
 
   // Helper methods for analysis
   private categorizeLength(wordCount: number): 'short' | 'medium' | 'long' {
-    if (wordCount < 10) return 'short';
-    if (wordCount < 50) return 'medium';
+    if (wordCount < 10) {
+      return 'short';
+    }
+    if (wordCount < 50) {
+      return 'medium';
+    }
     return 'long';
   }
 
   private categorizeResponseTime(ms: number): 'quick' | 'normal' | 'slow' {
-    if (ms < 30000) return 'quick'; // < 30 seconds
-    if (ms < 300000) return 'normal'; // < 5 minutes
+    if (ms < 30000) {
+      return 'quick';
+    } // < 30 seconds
+    if (ms < 300000) {
+      return 'normal';
+    } // < 5 minutes
     return 'slow';
   }
 
@@ -518,7 +547,7 @@ export class AdaptiveLearningEngine {
       /\b(furthermore|however|therefore|consequently)\b/gi,
       /[.!?]$/,
     ];
-    
+
     const informalIndicators = [
       /\b(yeah|yep|nah|gonna|wanna|kinda)\b/gi,
       /[!]{2,}/,
@@ -530,16 +559,22 @@ export class AdaptiveLearningEngine {
 
     formalIndicators.forEach(pattern => {
       const matches = message.match(pattern);
-      if (matches) formalScore += matches.length;
+      if (matches) {
+        formalScore += matches.length;
+      }
     });
 
     informalIndicators.forEach(pattern => {
       const matches = message.match(pattern);
-      if (matches) informalScore += matches.length;
+      if (matches) {
+        informalScore += matches.length;
+      }
     });
 
     const total = formalScore + informalScore;
-    if (total === 0) return 0.5; // Neutral
+    if (total === 0) {
+      return 0.5;
+    } // Neutral
 
     return formalScore / total;
   }
@@ -554,7 +589,9 @@ export class AdaptiveLearningEngine {
     let emotionalScore = 0;
     emotionalIndicators.forEach(pattern => {
       const matches = message.match(pattern);
-      if (matches) emotionalScore += matches.length;
+      if (matches) {
+        emotionalScore += matches.length;
+      }
     });
 
     // Normalize by message length
@@ -565,16 +602,16 @@ export class AdaptiveLearningEngine {
     // Simple engagement assessment based on response relevance and length
     const messageWords = message.toLowerCase().split(/\s+/);
     const questionWords = question.toLowerCase().split(/\s+/);
-    
+
     // Check for keyword overlap
-    const overlap = messageWords.filter(word => 
-      questionWords.includes(word) && word.length > 3
+    const overlap = messageWords.filter(
+      word => questionWords.includes(word) && word.length > 3
     ).length;
-    
+
     const relevanceScore = overlap / Math.max(questionWords.length, 1);
     const lengthScore = Math.min(1, messageWords.length / 20); // Normalize to 20 words
-    
-    return (relevanceScore * 0.6 + lengthScore * 0.4);
+
+    return relevanceScore * 0.6 + lengthScore * 0.4;
   }
 
   private extractTopics(message: string): string[] {
@@ -608,8 +645,12 @@ export class AdaptiveLearningEngine {
     const positiveCount = positiveWords.filter(word => lowerMessage.includes(word)).length;
     const negativeCount = negativeWords.filter(word => lowerMessage.includes(word)).length;
 
-    if (positiveCount > negativeCount) return 'positive';
-    if (negativeCount > positiveCount) return 'negative';
+    if (positiveCount > negativeCount) {
+      return 'positive';
+    }
+    if (negativeCount > positiveCount) {
+      return 'negative';
+    }
     return 'neutral';
   }
 
@@ -639,12 +680,18 @@ export class AdaptiveLearningEngine {
   }
 
   // Pattern analysis methods
-  private analyzeTimingPattern(userId: string, events: LearningEvent[]): UserBehaviorPattern | null {
+  private analyzeTimingPattern(
+    userId: string,
+    events: LearningEvent[]
+  ): UserBehaviorPattern | null {
     const timingEvents = events.filter(e => e.eventType === 'engagement_pattern');
-    if (timingEvents.length < this.MIN_EVENTS_FOR_PATTERN) return null;
+    if (timingEvents.length < this.MIN_EVENTS_FOR_PATTERN) {
+      return null;
+    }
 
     const responseTimes = timingEvents.map(e => e.data.responseTime as number);
-    const avgResponseTime = responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length;
+    const avgResponseTime =
+      responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length;
 
     return {
       patternId: `timing_${userId}_${Date.now()}`,
@@ -663,9 +710,14 @@ export class AdaptiveLearningEngine {
     };
   }
 
-  private analyzeLengthPattern(userId: string, events: LearningEvent[]): UserBehaviorPattern | null {
+  private analyzeLengthPattern(
+    userId: string,
+    events: LearningEvent[]
+  ): UserBehaviorPattern | null {
     const lengthEvents = events.filter(e => e.eventType === 'response_length_preference');
-    if (lengthEvents.length < this.MIN_EVENTS_FOR_PATTERN) return null;
+    if (lengthEvents.length < this.MIN_EVENTS_FOR_PATTERN) {
+      return null;
+    }
 
     const lengths = lengthEvents.map(e => e.data.length as number);
     const avgLength = lengths.reduce((sum, len) => sum + len, 0) / lengths.length;
@@ -687,12 +739,18 @@ export class AdaptiveLearningEngine {
     };
   }
 
-  private analyzeEmotionalPattern(userId: string, events: LearningEvent[]): UserBehaviorPattern | null {
+  private analyzeEmotionalPattern(
+    userId: string,
+    events: LearningEvent[]
+  ): UserBehaviorPattern | null {
     const emotionalEvents = events.filter(e => e.eventType === 'emotional_state_indicator');
-    if (emotionalEvents.length < this.MIN_EVENTS_FOR_PATTERN) return null;
+    if (emotionalEvents.length < this.MIN_EVENTS_FOR_PATTERN) {
+      return null;
+    }
 
     const expressiveness = emotionalEvents.map(e => e.data.expressiveness as number);
-    const avgExpressiveness = expressiveness.reduce((sum, exp) => sum + exp, 0) / expressiveness.length;
+    const avgExpressiveness =
+      expressiveness.reduce((sum, exp) => sum + exp, 0) / expressiveness.length;
 
     return {
       patternId: `emotional_${userId}_${Date.now()}`,
@@ -712,7 +770,9 @@ export class AdaptiveLearningEngine {
 
   private analyzeTopicPattern(userId: string, events: LearningEvent[]): UserBehaviorPattern | null {
     const topicEvents = events.filter(e => e.eventType === 'topic_interest_change');
-    if (topicEvents.length < this.MIN_EVENTS_FOR_PATTERN) return null;
+    if (topicEvents.length < this.MIN_EVENTS_FOR_PATTERN) {
+      return null;
+    }
 
     // Count topic frequencies
     const topicCounts: Record<string, number> = {};
@@ -724,7 +784,7 @@ export class AdaptiveLearningEngine {
     });
 
     const favoriteTopics = Object.entries(topicCounts)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 3)
       .map(([topic]) => topic);
 
@@ -788,7 +848,7 @@ export class AdaptiveLearningEngine {
           currentValue: [],
           suggestedValue: pattern.metadata.favoriteTopics,
           confidence: pattern.confidence,
-          reasoning: `User shows consistent interest in specific topics`,
+          reasoning: 'User shows consistent interest in specific topics',
           impact: 'high',
           priority: 7,
           validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 1 month
@@ -814,7 +874,7 @@ export class AdaptiveLearningEngine {
           confidence: pattern.confidence,
           actionable: true,
           suggestedActions: [
-            'Adjust response tone to match user\'s emotional style',
+            "Adjust response tone to match user's emotional style",
             'Include more empathetic language in questions',
             'Consider emotional context in question selection',
           ],
@@ -851,8 +911,9 @@ export class AdaptiveLearningEngine {
     const engagementEvents = events.filter(e => e.eventType === 'engagement_pattern');
     if (engagementEvents.length >= 5) {
       const recentEngagement = engagementEvents.slice(-5).map(e => e.data.engagement as number);
-      const avgRecent = recentEngagement.reduce((sum, eng) => sum + eng, 0) / recentEngagement.length;
-      
+      const avgRecent =
+        recentEngagement.reduce((sum, eng) => sum + eng, 0) / recentEngagement.length;
+
       if (avgRecent < 0.4) {
         insights.push({
           userId,
@@ -892,7 +953,9 @@ export class AdaptiveLearningEngine {
     }
   }
 
-  private async persistAdaptationRecommendation(recommendation: AdaptationRecommendation): Promise<void> {
+  private async persistAdaptationRecommendation(
+    recommendation: AdaptationRecommendation
+  ): Promise<void> {
     try {
       await this.dbService.saveAdaptationRecommendation(recommendation);
     } catch (error) {
@@ -928,4 +991,3 @@ interface ResponseAnalysis {
 
 // Global adaptive learning engine instance
 export const adaptiveLearningEngine = new AdaptiveLearningEngine();
-

@@ -3,9 +3,10 @@
  * Comprehensive data management with optimized queries, caching, validation, and performance monitoring
  */
 
-import { DatabaseService } from './database-service';
-import { performanceMonitor } from '../utils/monitoring';
 import { FylgjaError, createValidationError, createDatabaseError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
+
+import { DatabaseService } from './database-service';
 
 export interface QueryOptions {
   limit?: number;
@@ -101,14 +102,14 @@ export class EnhancedDatabaseService extends DatabaseService {
   private validationRules: Map<string, DataValidationRule[]> = new Map();
   private performanceMetrics: PerformanceMetrics;
   private queryOptimizer: QueryOptimizer;
-  
+
   private readonly SLOW_QUERY_THRESHOLD = 1000; // 1 second
   private readonly MAX_BATCH_SIZE = 500;
   private readonly CACHE_CLEANUP_INTERVAL = 300000; // 5 minutes
 
   constructor(cacheConfig: Partial<CacheConfig> = {}) {
     super();
-    
+
     this.cacheConfig = {
       enabled: true,
       defaultTTL: 300000, // 5 minutes
@@ -136,12 +137,12 @@ export class EnhancedDatabaseService extends DatabaseService {
    * Enhanced user profile operations
    */
   async getUserProfileEnhanced(
-    userId: string, 
+    userId: string,
     options: QueryOptions = {}
   ): Promise<QueryResult<any>> {
     const timerId = performanceMonitor.startTimer('get_user_profile_enhanced');
     const cacheKey = `user_profile_${userId}`;
-    
+
     try {
       // Check cache first
       if (options.useCache !== false && this.cacheConfig.enabled) {
@@ -162,7 +163,7 @@ export class EnhancedDatabaseService extends DatabaseService {
 
       // Query database
       const profile = await this.getUserProfile(userId);
-      
+
       if (!profile) {
         return {
           data: [],
@@ -181,7 +182,11 @@ export class EnhancedDatabaseService extends DatabaseService {
         this.setCache(cacheKey, profile, options.cacheTTL);
       }
 
-      this.updatePerformanceMetrics('get_user_profile', performanceMonitor.endTimer(timerId), false);
+      this.updatePerformanceMetrics(
+        'get_user_profile',
+        performanceMonitor.endTimer(timerId),
+        false
+      );
 
       return {
         data: [profile],
@@ -193,7 +198,6 @@ export class EnhancedDatabaseService extends DatabaseService {
           indexesUsed: ['users_by_id'],
         },
       };
-
     } catch (error) {
       this.updatePerformanceMetrics('get_user_profile', performanceMonitor.endTimer(timerId), true);
       throw createDatabaseError(`Failed to get user profile: ${error.message}`);
@@ -209,7 +213,7 @@ export class EnhancedDatabaseService extends DatabaseService {
   ): Promise<QueryResult<any>> {
     const timerId = performanceMonitor.startTimer('get_interactions_enhanced');
     const cacheKey = `interactions_${userId}_${JSON.stringify(options)}`;
-    
+
     try {
       // Check cache
       if (options.useCache !== false && this.cacheConfig.enabled) {
@@ -222,9 +226,13 @@ export class EnhancedDatabaseService extends DatabaseService {
       // Build optimized query
       const query = this.queryOptimizer.buildInteractionQuery(userId, options);
       const interactions = await this.executeOptimizedQuery('interactions', query);
-      
+
       // Get total count for pagination
-      const totalQuery = this.queryOptimizer.buildCountQuery('interactions', userId, options.filters);
+      const totalQuery = this.queryOptimizer.buildCountQuery(
+        'interactions',
+        userId,
+        options.filters
+      );
       const totalResult = await this.executeOptimizedQuery('interactions_count', totalQuery);
       const total = totalResult[0]?.count || 0;
 
@@ -232,8 +240,10 @@ export class EnhancedDatabaseService extends DatabaseService {
         data: interactions,
         total,
         hasMore: (options.offset || 0) + interactions.length < total,
-        nextOffset: interactions.length === (options.limit || 50) ? 
-          (options.offset || 0) + interactions.length : undefined,
+        nextOffset:
+          interactions.length === (options.limit || 50)
+            ? (options.offset || 0) + interactions.length
+            : undefined,
         metadata: {
           queryTime: performanceMonitor.endTimer(timerId),
           cacheHit: false,
@@ -249,7 +259,6 @@ export class EnhancedDatabaseService extends DatabaseService {
 
       this.updatePerformanceMetrics('get_interactions', result.metadata.queryTime, false);
       return result;
-
     } catch (error) {
       this.updatePerformanceMetrics('get_interactions', performanceMonitor.endTimer(timerId), true);
       throw createDatabaseError(`Failed to get interactions: ${error.message}`);
@@ -265,7 +274,7 @@ export class EnhancedDatabaseService extends DatabaseService {
     options: QueryOptions = {}
   ): Promise<QueryResult<any>> {
     const timerId = performanceMonitor.startTimer('search_interactions');
-    
+
     try {
       // Validate search query
       if (!searchQuery || searchQuery.trim().length < 2) {
@@ -291,16 +300,19 @@ export class EnhancedDatabaseService extends DatabaseService {
           queryTime: performanceMonitor.endTimer(timerId),
           cacheHit: false,
           indexesUsed: ['interactions_fulltext', 'interactions_by_user'],
-          optimizationSuggestions: total > 1000 ? 
-            ['Consider adding date range filter for better performance'] : [],
+          optimizationSuggestions:
+            total > 1000 ? ['Consider adding date range filter for better performance'] : [],
         },
       };
 
       this.updatePerformanceMetrics('search_interactions', result.metadata.queryTime, false);
       return result;
-
     } catch (error) {
-      this.updatePerformanceMetrics('search_interactions', performanceMonitor.endTimer(timerId), true);
+      this.updatePerformanceMetrics(
+        'search_interactions',
+        performanceMonitor.endTimer(timerId),
+        true
+      );
       throw createDatabaseError(`Search failed: ${error.message}`);
     }
   }
@@ -314,7 +326,7 @@ export class EnhancedDatabaseService extends DatabaseService {
   ): Promise<BulkResult> {
     const startTime = Date.now();
     const batchSize = Math.min(options.batchSize || 100, this.MAX_BATCH_SIZE);
-    
+
     let processed = 0;
     let failed = 0;
     const errors: BulkResult['errors'] = [];
@@ -323,7 +335,7 @@ export class EnhancedDatabaseService extends DatabaseService {
     try {
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         const batch = batches[batchIndex];
-        
+
         try {
           // Validate batch if requested
           if (options.validateBeforeWrite) {
@@ -331,9 +343,11 @@ export class EnhancedDatabaseService extends DatabaseService {
               const validation = this.validateData('interaction', batch[i]);
               if (!validation.valid) {
                 if (!options.continueOnError) {
-                  throw createValidationError(`Validation failed for item ${i}: ${validation.errors[0].message}`);
+                  throw createValidationError(
+                    `Validation failed for item ${i}: ${validation.errors[0].message}`
+                  );
                 }
-                
+
                 errors.push({
                   index: batchIndex * batchSize + i,
                   error: validation.errors[0].message,
@@ -348,7 +362,6 @@ export class EnhancedDatabaseService extends DatabaseService {
           // Process batch
           await this.processBatch('create', 'interactions', batch);
           processed += batch.length;
-
         } catch (error) {
           if (!options.continueOnError) {
             throw error;
@@ -367,7 +380,7 @@ export class EnhancedDatabaseService extends DatabaseService {
       }
 
       const totalTime = Date.now() - startTime;
-      
+
       // Invalidate related caches
       this.invalidateCachePattern('interactions_');
 
@@ -382,7 +395,6 @@ export class EnhancedDatabaseService extends DatabaseService {
           batchCount: batches.length,
         },
       };
-
     } catch (error) {
       throw createDatabaseError(`Bulk create failed: ${error.message}`);
     }
@@ -408,7 +420,7 @@ export class EnhancedDatabaseService extends DatabaseService {
   }> {
     const timerId = performanceMonitor.startTimer('get_interaction_analytics');
     const cacheKey = `analytics_${userId}_${timeRange.start}_${timeRange.end}`;
-    
+
     try {
       // Check cache
       if (options.useCache !== false && this.cacheConfig.enabled) {
@@ -461,7 +473,6 @@ export class EnhancedDatabaseService extends DatabaseService {
           cacheHit: false,
         },
       };
-
     } catch (error) {
       this.updatePerformanceMetrics('get_analytics', performanceMonitor.endTimer(timerId), true);
       throw createDatabaseError(`Analytics query failed: ${error.message}`);
@@ -532,10 +543,14 @@ export class EnhancedDatabaseService extends DatabaseService {
    * Cache management
    */
   private getFromCache(key: string): any | null {
-    if (!this.cacheConfig.enabled) return null;
+    if (!this.cacheConfig.enabled) {
+      return null;
+    }
 
     const entry = this.cache.get(key);
-    if (!entry) return null;
+    if (!entry) {
+      return null;
+    }
 
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
@@ -548,7 +563,9 @@ export class EnhancedDatabaseService extends DatabaseService {
   }
 
   private setCache(key: string, data: any, ttl?: number): void {
-    if (!this.cacheConfig.enabled) return;
+    if (!this.cacheConfig.enabled) {
+      return;
+    }
 
     // Check cache size limit
     if (this.cache.size >= this.cacheConfig.maxSize) {
@@ -568,7 +585,7 @@ export class EnhancedDatabaseService extends DatabaseService {
 
   private invalidateCachePattern(pattern: string): void {
     const keysToDelete: string[] = [];
-    
+
     for (const key of this.cache.keys()) {
       if (key.includes(pattern)) {
         keysToDelete.push(key);
@@ -580,17 +597,17 @@ export class EnhancedDatabaseService extends DatabaseService {
 
   private evictCache(): void {
     const entries = Array.from(this.cache.entries());
-    
+
     switch (this.cacheConfig.evictionPolicy) {
       case 'lru':
-        entries.sort(([,a], [,b]) => a.lastAccessed - b.lastAccessed);
+        entries.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
         break;
       case 'lfu':
         // Would need access count tracking
-        entries.sort(([,a], [,b]) => a.lastAccessed - b.lastAccessed);
+        entries.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
         break;
       case 'ttl':
-        entries.sort(([,a], [,b]) => a.expiresAt - b.expiresAt);
+        entries.sort(([, a], [, b]) => a.expiresAt - b.expiresAt);
         break;
     }
 
@@ -621,10 +638,12 @@ export class EnhancedDatabaseService extends DatabaseService {
    */
   private updatePerformanceMetrics(operation: string, time: number, isError: boolean): void {
     this.performanceMetrics.queryCount++;
-    
+
     // Update average query time
-    const totalTime = this.performanceMetrics.averageQueryTime * (this.performanceMetrics.queryCount - 1);
-    this.performanceMetrics.averageQueryTime = (totalTime + time) / this.performanceMetrics.queryCount;
+    const totalTime =
+      this.performanceMetrics.averageQueryTime * (this.performanceMetrics.queryCount - 1);
+    this.performanceMetrics.averageQueryTime =
+      (totalTime + time) / this.performanceMetrics.queryCount;
 
     // Track slow queries
     if (time > this.SLOW_QUERY_THRESHOLD) {
@@ -708,17 +727,27 @@ export class EnhancedDatabaseService extends DatabaseService {
     return 0;
   }
 
-  private async getTopTopics(userId: string, timeRange: any, limit: number): Promise<Array<{ topic: string; count: number }>> {
+  private async getTopTopics(
+    userId: string,
+    timeRange: any,
+    limit: number
+  ): Promise<Array<{ topic: string; count: number }>> {
     // Implementation would aggregate topic data
     return [];
   }
 
-  private async getEngagementTrend(userId: string, timeRange: any): Promise<Array<{ date: string; engagement: number }>> {
+  private async getEngagementTrend(
+    userId: string,
+    timeRange: any
+  ): Promise<Array<{ date: string; engagement: number }>> {
     // Implementation would calculate daily engagement scores
     return [];
   }
 
-  private async getSentimentDistribution(userId: string, timeRange: any): Promise<Record<string, number>> {
+  private async getSentimentDistribution(
+    userId: string,
+    timeRange: any
+  ): Promise<Record<string, number>> {
     // Implementation would aggregate sentiment data
     return {};
   }
@@ -748,7 +777,7 @@ class QueryOptimizer {
 
   buildInteractionQuery(userId: string, options: QueryOptions): any {
     this.usedIndexes = ['interactions_by_user'];
-    
+
     // Build optimized query based on options
     const query: any = {
       userId,
@@ -788,7 +817,7 @@ class QueryOptimizer {
     options: QueryOptions
   ): any {
     this.usedIndexes = [`${collection}_fulltext`, `${collection}_by_user`];
-    
+
     return {
       collection,
       userId,
@@ -809,4 +838,3 @@ class QueryOptimizer {
 
 // Global enhanced database service instance
 export const enhancedDatabaseService = new EnhancedDatabaseService();
-

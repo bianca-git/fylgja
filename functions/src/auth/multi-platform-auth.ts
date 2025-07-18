@@ -3,12 +3,19 @@
  * Unified authentication layer supporting WhatsApp, Web, Google Home, and API access
  */
 
-import { AuthenticationService, LoginRequest, RegistrationRequest, DeviceInfo } from './authentication-service';
-import { SessionManager } from './session-manager';
-import { performanceMonitor } from '../utils/monitoring';
-import { FylgjaError, createAuthError, createSystemError } from '../utils/error-handler';
-import { cacheService } from '../cache/redis-cache-service';
 import * as crypto from 'crypto';
+
+import { cacheService } from '../cache/redis-cache-service';
+import { FylgjaError, createAuthError, createSystemError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
+
+import {
+  AuthenticationService,
+  LoginRequest,
+  RegistrationRequest,
+  DeviceInfo,
+} from './authentication-service';
+import { SessionManager } from './session-manager';
 
 export interface PlatformAuthConfig {
   platform: 'whatsapp' | 'web' | 'google_home' | 'api';
@@ -74,48 +81,65 @@ export interface PlatformAuthResponse {
 export class MultiPlatformAuth {
   private authService: AuthenticationService;
   private sessionManager: SessionManager;
-  
+
   private readonly PLATFORM_CONFIGS: Map<string, PlatformAuthConfig> = new Map([
-    ['whatsapp', {
-      platform: 'whatsapp',
-      authMethod: 'phone_verification',
-      requiresVerification: true,
-      verificationMethod: 'sms',
-      sessionDuration: 60, // 1 hour
-      allowsRegistration: true,
-      requiresDeviceRegistration: false,
-      supportedFeatures: ['messaging', 'voice_notes', 'media_sharing', 'reminders'],
-    }],
-    ['web', {
-      platform: 'web',
-      authMethod: 'email_password',
-      requiresVerification: true,
-      verificationMethod: 'email',
-      sessionDuration: 30, // 30 minutes
-      allowsRegistration: true,
-      requiresDeviceRegistration: true,
-      supportedFeatures: ['full_dashboard', 'data_export', 'advanced_settings', 'legacy_management'],
-    }],
-    ['google_home', {
-      platform: 'google_home',
-      authMethod: 'device_token',
-      requiresVerification: true,
-      verificationMethod: 'voice',
-      sessionDuration: 120, // 2 hours
-      allowsRegistration: false, // Must register via web first
-      requiresDeviceRegistration: true,
-      supportedFeatures: ['voice_commands', 'audio_responses', 'smart_home_integration'],
-    }],
-    ['api', {
-      platform: 'api',
-      authMethod: 'api_key',
-      requiresVerification: false,
-      verificationMethod: 'none',
-      sessionDuration: 240, // 4 hours
-      allowsRegistration: false, // API keys generated via web
-      requiresDeviceRegistration: false,
-      supportedFeatures: ['data_access', 'automation', 'integrations', 'webhooks'],
-    }],
+    [
+      'whatsapp',
+      {
+        platform: 'whatsapp',
+        authMethod: 'phone_verification',
+        requiresVerification: true,
+        verificationMethod: 'sms',
+        sessionDuration: 60, // 1 hour
+        allowsRegistration: true,
+        requiresDeviceRegistration: false,
+        supportedFeatures: ['messaging', 'voice_notes', 'media_sharing', 'reminders'],
+      },
+    ],
+    [
+      'web',
+      {
+        platform: 'web',
+        authMethod: 'email_password',
+        requiresVerification: true,
+        verificationMethod: 'email',
+        sessionDuration: 30, // 30 minutes
+        allowsRegistration: true,
+        requiresDeviceRegistration: true,
+        supportedFeatures: [
+          'full_dashboard',
+          'data_export',
+          'advanced_settings',
+          'legacy_management',
+        ],
+      },
+    ],
+    [
+      'google_home',
+      {
+        platform: 'google_home',
+        authMethod: 'device_token',
+        requiresVerification: true,
+        verificationMethod: 'voice',
+        sessionDuration: 120, // 2 hours
+        allowsRegistration: false, // Must register via web first
+        requiresDeviceRegistration: true,
+        supportedFeatures: ['voice_commands', 'audio_responses', 'smart_home_integration'],
+      },
+    ],
+    [
+      'api',
+      {
+        platform: 'api',
+        authMethod: 'api_key',
+        requiresVerification: false,
+        verificationMethod: 'none',
+        sessionDuration: 240, // 4 hours
+        allowsRegistration: false, // API keys generated via web
+        requiresDeviceRegistration: false,
+        supportedFeatures: ['data_access', 'automation', 'integrations', 'webhooks'],
+      },
+    ],
   ]);
 
   constructor() {
@@ -144,7 +168,7 @@ export class MultiPlatformAuth {
         if (!request.verificationCode) {
           // Send verification code
           await this.sendWhatsAppVerification(request.phoneNumber);
-          
+
           return {
             success: false,
             platform: 'whatsapp',
@@ -159,7 +183,10 @@ export class MultiPlatformAuth {
         }
 
         // Verify code and register
-        const isValidCode = await this.verifyWhatsAppCode(request.phoneNumber, request.verificationCode);
+        const isValidCode = await this.verifyWhatsAppCode(
+          request.phoneNumber,
+          request.verificationCode
+        );
         if (!isValidCode) {
           throw createAuthError('Invalid verification code');
         }
@@ -184,13 +211,12 @@ export class MultiPlatformAuth {
           session: registrationResult.session,
           message: 'WhatsApp registration successful',
         };
-
       } else {
         // Login flow
         if (!request.verificationCode) {
           // Send verification code for login
           await this.sendWhatsAppVerification(request.phoneNumber);
-          
+
           return {
             success: false,
             platform: 'whatsapp',
@@ -205,7 +231,10 @@ export class MultiPlatformAuth {
         }
 
         // Verify code and login
-        const isValidCode = await this.verifyWhatsAppCode(request.phoneNumber, request.verificationCode);
+        const isValidCode = await this.verifyWhatsAppCode(
+          request.phoneNumber,
+          request.verificationCode
+        );
         if (!isValidCode) {
           throw createAuthError('Invalid verification code');
         }
@@ -232,7 +261,6 @@ export class MultiPlatformAuth {
           message: 'WhatsApp login successful',
         };
       }
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`WhatsApp authentication failed: ${error.message}`);
@@ -257,7 +285,6 @@ export class MultiPlatformAuth {
       } else {
         throw createAuthError('Invalid web authentication request');
       }
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Web authentication failed: ${error.message}`);
@@ -280,7 +307,9 @@ export class MultiPlatformAuth {
       }
 
       // Find user by Google account ID or device ID
-      const existingUser = await this.findUserByGoogleAccount(request.googleAccountId || request.deviceId);
+      const existingUser = await this.findUserByGoogleAccount(
+        request.googleAccountId || request.deviceId
+      );
       if (!existingUser) {
         throw createAuthError('User must register via web platform first');
       }
@@ -317,7 +346,6 @@ export class MultiPlatformAuth {
         session: loginResult.session,
         message: 'Google Home authentication successful',
       };
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Google Home authentication failed: ${error.message}`);
@@ -340,7 +368,7 @@ export class MultiPlatformAuth {
       }
 
       // Check scope permissions
-      const hasRequiredScope = request.scope.every(scope => 
+      const hasRequiredScope = request.scope.every(scope =>
         apiKeyInfo.allowedScopes.includes(scope)
       );
 
@@ -369,7 +397,6 @@ export class MultiPlatformAuth {
         session: loginResult.session,
         message: 'API authentication successful',
       };
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`API authentication failed: ${error.message}`);
@@ -394,11 +421,7 @@ export class MultiPlatformAuth {
   /**
    * Link new platform to existing user
    */
-  async linkPlatformToUser(
-    uid: string,
-    platform: string,
-    platformData: any
-  ): Promise<void> {
+  async linkPlatformToUser(uid: string, platform: string, platformData: any): Promise<void> {
     const timerId = performanceMonitor.startTimer('link_platform');
 
     try {
@@ -427,7 +450,6 @@ export class MultiPlatformAuth {
       }
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to link platform: ${error.message}`);
@@ -437,7 +459,9 @@ export class MultiPlatformAuth {
   /**
    * Private helper methods
    */
-  private async authenticateWebEmailPassword(request: WebAuthRequest): Promise<PlatformAuthResponse> {
+  private async authenticateWebEmailPassword(
+    request: WebAuthRequest
+  ): Promise<PlatformAuthResponse> {
     const existingUser = await this.findUserByEmail(request.email);
 
     if (!existingUser) {
@@ -464,7 +488,6 @@ export class MultiPlatformAuth {
         nextStep: registrationResult.requiresVerification ? 'email_verification' : undefined,
         message: 'Web registration successful',
       };
-
     } else {
       // Login flow
       const loginRequest: LoginRequest = {
@@ -524,7 +547,6 @@ export class MultiPlatformAuth {
         session: registrationResult.session,
         message: 'OAuth registration successful',
       };
-
     } else {
       // Login via OAuth
       const loginRequest: LoginRequest = {
@@ -569,7 +591,7 @@ export class MultiPlatformAuth {
   private async sendWhatsAppVerification(phoneNumber: string): Promise<void> {
     const verificationCode = this.generateVerificationCode();
     const cacheKey = `whatsapp_verification_${phoneNumber}`;
-    
+
     // Store code in cache
     await cacheService.set(cacheKey, verificationCode, { ttl: 600000 }); // 10 minutes
 
@@ -580,12 +602,12 @@ export class MultiPlatformAuth {
   private async verifyWhatsAppCode(phoneNumber: string, code: string): Promise<boolean> {
     const cacheKey = `whatsapp_verification_${phoneNumber}`;
     const storedCode = await cacheService.get(cacheKey);
-    
+
     if (storedCode === code) {
       await cacheService.delete(cacheKey);
       return true;
     }
-    
+
     return false;
   }
 
@@ -599,7 +621,10 @@ export class MultiPlatformAuth {
     return false; // Simplified for demo
   }
 
-  private async registerGoogleHomeDevice(uid: string, request: GoogleHomeAuthRequest): Promise<void> {
+  private async registerGoogleHomeDevice(
+    uid: string,
+    request: GoogleHomeAuthRequest
+  ): Promise<void> {
     // Register Google Home device for user
     console.log(`Registering Google Home device ${request.deviceId} for user ${uid}`);
   }
@@ -628,9 +653,9 @@ export class MultiPlatformAuth {
   private async sendPlatformVerification(platform: string, identifier: string): Promise<void> {
     const verificationCode = this.generateVerificationCode();
     const cacheKey = `platform_verification_${platform}_${identifier}`;
-    
+
     await cacheService.set(cacheKey, verificationCode, { ttl: 600000 });
-    
+
     console.log(`Verification code for ${platform} ${identifier}: ${verificationCode}`);
   }
 
@@ -651,7 +676,7 @@ export class MultiPlatformAuth {
 
   private getDefaultPermissions(platform: string): string[] {
     const basePermissions = ['read_profile', 'update_profile'];
-    
+
     switch (platform) {
       case 'whatsapp':
         return [...basePermissions, 'send_messages', 'receive_messages'];
@@ -673,4 +698,3 @@ export class MultiPlatformAuth {
 
 // Global multi-platform auth instance
 export const multiPlatformAuth = new MultiPlatformAuth();
-

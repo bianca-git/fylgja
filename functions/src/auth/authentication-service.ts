@@ -4,13 +4,15 @@
  * secure session management, and multi-platform support
  */
 
-import { auth } from 'firebase-admin';
-import { EnhancedDatabaseService } from '../services/enhanced-database-service';
-import { performanceMonitor } from '../utils/monitoring';
-import { FylgjaError, createAuthError, createSystemError } from '../utils/error-handler';
-import { cacheService } from '../cache/redis-cache-service';
 import * as crypto from 'crypto';
+
+import { auth } from 'firebase-admin';
 import * as jwt from 'jsonwebtoken';
+
+import { cacheService } from '../cache/redis-cache-service';
+import { EnhancedDatabaseService } from '../services/enhanced-database-service';
+import { FylgjaError, createAuthError, createSystemError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
 
 export interface UserAuthProfile {
   uid: string;
@@ -223,15 +225,16 @@ export interface VerificationResponse {
 export class AuthenticationService {
   private database: EnhancedDatabaseService;
   private firebaseAuth: auth.Auth;
-  
+
   private readonly SESSION_CACHE_TTL = 1800000; // 30 minutes
   private readonly TOKEN_CACHE_TTL = 3600000; // 1 hour
   private readonly VERIFICATION_CODE_TTL = 600000; // 10 minutes
   private readonly MAX_LOGIN_ATTEMPTS = 5;
   private readonly LOCKOUT_DURATION = 900000; // 15 minutes
-  
+
   private readonly JWT_SECRET = process.env.JWT_SECRET || 'fylgja-jwt-secret';
-  private readonly REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'fylgja-refresh-secret';
+  private readonly REFRESH_TOKEN_SECRET =
+    process.env.REFRESH_TOKEN_SECRET || 'fylgja-refresh-secret';
 
   constructor() {
     this.database = new EnhancedDatabaseService();
@@ -287,7 +290,6 @@ export class AuthenticationService {
         verificationMethod: verification.method,
         message: 'User registered successfully',
       };
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Registration failed: ${error.message}`);
@@ -331,7 +333,7 @@ export class AuthenticationService {
       if (verificationRequired.required) {
         // Create temporary session for verification
         const tempSession = await this.createTemporarySession(userProfile.uid, request);
-        
+
         return {
           success: false,
           user: userProfile,
@@ -373,7 +375,6 @@ export class AuthenticationService {
         session,
         message: 'Login successful',
       };
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Login failed: ${error.message}`);
@@ -420,7 +421,6 @@ export class AuthenticationService {
         verified: true,
         message: 'Verification successful',
       };
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Verification failed: ${error.message}`);
@@ -444,7 +444,7 @@ export class AuthenticationService {
           const hasPermissions = requiredPermissions.every(permission =>
             cachedContext.permissions.includes(permission)
           );
-          
+
           if (!hasPermissions) {
             throw createAuthError('Insufficient permissions');
           }
@@ -459,7 +459,7 @@ export class AuthenticationService {
 
       // Get session information
       const session = await this.getAuthSession(decoded.sessionId);
-      if (!session || !session.isActive) {
+      if (!session?.isActive) {
         throw createAuthError('Invalid or expired session');
       }
 
@@ -486,7 +486,7 @@ export class AuthenticationService {
         const hasPermissions = requiredPermissions.every(permission =>
           authContext.permissions.includes(permission)
         );
-        
+
         if (!hasPermissions) {
           throw createAuthError('Insufficient permissions');
         }
@@ -500,7 +500,6 @@ export class AuthenticationService {
 
       performanceMonitor.endTimer(timerId);
       return authContext;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Token validation failed: ${error.message}`);
@@ -531,7 +530,6 @@ export class AuthenticationService {
 
       performanceMonitor.endTimer(timerId);
       return newTokens;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Token refresh failed: ${error.message}`);
@@ -555,7 +553,6 @@ export class AuthenticationService {
       await this.logAuthEvent('user_logout', uid, { sessionId });
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Logout failed: ${error.message}`);
@@ -589,7 +586,6 @@ export class AuthenticationService {
 
       performanceMonitor.endTimer(timerId);
       return profile;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to get user profile: ${error.message}`);
@@ -614,7 +610,6 @@ export class AuthenticationService {
       await this.logAuthEvent('profile_update', uid, { updates: Object.keys(updates) });
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to update user profile: ${error.message}`);
@@ -631,8 +626,8 @@ export class AuthenticationService {
       const userProfile = await this.getUserAuthProfile(uid);
 
       // Check if platform already linked
-      const existingPlatform = userProfile.platforms.find(p => 
-        p.platform === platform.platform && p.identifier === platform.identifier
+      const existingPlatform = userProfile.platforms.find(
+        p => p.platform === platform.platform && p.identifier === platform.identifier
       );
 
       if (existingPlatform) {
@@ -653,7 +648,6 @@ export class AuthenticationService {
       await this.logAuthEvent('platform_linked', uid, { platform: platform.platform });
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to link platform: ${error.message}`);
@@ -670,8 +664,8 @@ export class AuthenticationService {
       const userProfile = await this.getUserAuthProfile(uid);
 
       // Check if user has other platforms (prevent account lockout)
-      const otherPlatforms = userProfile.platforms.filter(p => 
-        !(p.platform === platform && p.identifier === identifier)
+      const otherPlatforms = userProfile.platforms.filter(
+        p => !(p.platform === platform && p.identifier === identifier)
       );
 
       if (otherPlatforms.length === 0) {
@@ -691,7 +685,6 @@ export class AuthenticationService {
       await this.logAuthEvent('platform_unlinked', uid, { platform });
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to unlink platform: ${error.message}`);
@@ -705,16 +698,19 @@ export class AuthenticationService {
     const timerId = performanceMonitor.startTimer('get_user_sessions');
 
     try {
-      const sessions = await this.database.queryDocuments('auth_sessions', [
-        { field: 'uid', operator: '==', value: uid },
-        { field: 'isActive', operator: '==', value: true },
-      ], {
-        orderBy: [{ field: 'lastActivity', direction: 'desc' }],
-      });
+      const sessions = await this.database.queryDocuments(
+        'auth_sessions',
+        [
+          { field: 'uid', operator: '==', value: uid },
+          { field: 'isActive', operator: '==', value: true },
+        ],
+        {
+          orderBy: [{ field: 'lastActivity', direction: 'desc' }],
+        }
+      );
 
       performanceMonitor.endTimer(timerId);
       return sessions.documents;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createAuthError(`Failed to get user sessions: ${error.message}`);
@@ -739,7 +735,6 @@ export class AuthenticationService {
       await cacheService.delete(cacheKey);
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Failed to deactivate session: ${error.message}`);
@@ -762,7 +757,7 @@ export class AuthenticationService {
       throw createAuthError('Phone number is required for WhatsApp registration');
     }
 
-    if (!request.deviceInfo || !request.deviceInfo.deviceId) {
+    if (!request.deviceInfo?.deviceId) {
       throw createAuthError('Device information is required');
     }
   }
@@ -772,7 +767,7 @@ export class AuthenticationService {
       throw createAuthError('Platform and identifier are required');
     }
 
-    if (!request.deviceInfo || !request.deviceInfo.deviceId) {
+    if (!request.deviceInfo?.deviceId) {
       throw createAuthError('Device information is required');
     }
   }
@@ -789,7 +784,7 @@ export class AuthenticationService {
 
   private async findExistingUser(request: RegistrationRequest): Promise<UserAuthProfile | null> {
     try {
-      let query: any[] = [];
+      const query: any[] = [];
 
       if (request.email) {
         query.push({ field: 'email', operator: '==', value: request.email });
@@ -799,11 +794,12 @@ export class AuthenticationService {
         query.push({ field: 'phoneNumber', operator: '==', value: request.phoneNumber });
       }
 
-      if (query.length === 0) return null;
+      if (query.length === 0) {
+        return null;
+      }
 
       const result = await this.database.queryDocuments('user_auth_profiles', query, { limit: 1 });
       return result.documents.length > 0 ? result.documents[0] : null;
-
     } catch (error) {
       console.warn('Error finding existing user:', error);
       return null;
@@ -843,15 +839,17 @@ export class AuthenticationService {
       photoURL: firebaseUser.photoURL,
       emailVerified: firebaseUser.emailVerified,
       phoneVerified: false,
-      platforms: [{
-        platform: request.platform,
-        identifier: request.email || request.phoneNumber || request.deviceInfo.deviceId,
-        verified: false,
-        linkedAt: new Date().toISOString(),
-        lastUsed: new Date().toISOString(),
-        deviceInfo: request.deviceInfo,
-        permissions: this.getDefaultPermissions(request.platform),
-      }],
+      platforms: [
+        {
+          platform: request.platform,
+          identifier: request.email || request.phoneNumber || request.deviceInfo.deviceId,
+          verified: false,
+          linkedAt: new Date().toISOString(),
+          lastUsed: new Date().toISOString(),
+          deviceInfo: request.deviceInfo,
+          permissions: this.getDefaultPermissions(request.platform),
+        },
+      ],
       createdAt: new Date().toISOString(),
       lastLoginAt: new Date().toISOString(),
       loginCount: 1,
@@ -904,9 +902,12 @@ export class AuthenticationService {
     return profile;
   }
 
-  private async createAuthSession(uid: string, request: LoginRequest | RegistrationRequest): Promise<AuthSession> {
+  private async createAuthSession(
+    uid: string,
+    request: LoginRequest | RegistrationRequest
+  ): Promise<AuthSession> {
     const sessionId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + (30 * 60 * 1000)); // 30 minutes
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
     const session: AuthSession = {
       sessionId,
@@ -935,7 +936,7 @@ export class AuthenticationService {
 
   private async createTemporarySession(uid: string, request: LoginRequest): Promise<AuthSession> {
     const sessionId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + (10 * 60 * 1000)); // 10 minutes for verification
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes for verification
 
     const session: AuthSession = {
       sessionId,
@@ -971,7 +972,9 @@ export class AuthenticationService {
     };
 
     const accessToken = jwt.sign(accessTokenPayload, this.JWT_SECRET, { expiresIn: '1h' });
-    const refreshToken = jwt.sign(refreshTokenPayload, this.REFRESH_TOKEN_SECRET, { expiresIn: '7d' });
+    const refreshToken = jwt.sign(refreshTokenPayload, this.REFRESH_TOKEN_SECRET, {
+      expiresIn: '7d',
+    });
 
     // Update session with refresh token
     await this.updateSessionRefreshToken(session.sessionId, refreshToken);
@@ -1011,21 +1014,24 @@ export class AuthenticationService {
     identifier: string
   ): Promise<UserAuthProfile | null> {
     try {
-      const result = await this.database.queryDocuments('user_auth_profiles', [
-        { field: `platforms.${platform}.identifier`, operator: '==', value: identifier },
-      ], { limit: 1 });
+      const result = await this.database.queryDocuments(
+        'user_auth_profiles',
+        [{ field: `platforms.${platform}.identifier`, operator: '==', value: identifier }],
+        { limit: 1 }
+      );
 
       return result.documents.length > 0 ? result.documents[0] : null;
-
     } catch (error) {
       // Fallback to broader search
       const allUsers = await this.database.queryDocuments('user_auth_profiles', [], {});
-      
-      return allUsers.documents.find(user => 
-        user.platforms.some((p: AuthPlatform) => 
-          p.platform === platform && p.identifier === identifier
-        )
-      ) || null;
+
+      return (
+        allUsers.documents.find(user =>
+          user.platforms.some(
+            (p: AuthPlatform) => p.platform === platform && p.identifier === identifier
+          )
+        ) || null
+      );
     }
   }
 
@@ -1038,7 +1044,7 @@ export class AuthenticationService {
       case 'whatsapp':
         // For WhatsApp, verification is typically done via phone number verification
         return true; // Simplified for demo
-      
+
       case 'web':
         // For web, verify password
         if (request.credential) {
@@ -1051,15 +1057,15 @@ export class AuthenticationService {
           }
         }
         return false;
-      
+
       case 'google_home':
         // For Google Home, verify device token
         return request.credential ? true : false;
-      
+
       case 'api':
         // For API, verify API key
         return request.credential ? true : false;
-      
+
       default:
         return false;
     }
@@ -1070,11 +1076,11 @@ export class AuthenticationService {
     request: LoginRequest
   ): Promise<{ required: boolean; method?: string }> {
     // Check if platform is verified
-    const platform = userProfile.platforms.find(p => 
-      p.platform === request.platform && p.identifier === request.identifier
+    const platform = userProfile.platforms.find(
+      p => p.platform === request.platform && p.identifier === request.identifier
     );
 
-    if (!platform || !platform.verified) {
+    if (!platform?.verified) {
       return {
         required: true,
         method: userProfile.email ? 'email' : 'phone',
@@ -1108,14 +1114,13 @@ export class AuthenticationService {
     // Get from database
     try {
       const session = await this.database.getDocument('auth_sessions', sessionId);
-      
+
       if (session) {
         // Cache the session
         await cacheService.set(cacheKey, session, { ttl: this.SESSION_CACHE_TTL });
       }
 
       return session;
-
     } catch (error) {
       return null;
     }
@@ -1131,9 +1136,13 @@ export class AuthenticationService {
     // Update cache
     const cacheKey = `session_${sessionId}`;
     const cachedSession = await cacheService.get(cacheKey);
-    
+
     if (cachedSession) {
-      await cacheService.set(cacheKey, { ...cachedSession, ...updates }, { ttl: this.SESSION_CACHE_TTL });
+      await cacheService.set(
+        cacheKey,
+        { ...cachedSession, ...updates },
+        { ttl: this.SESSION_CACHE_TTL }
+      );
     }
   }
 
@@ -1143,9 +1152,13 @@ export class AuthenticationService {
     // Update cache
     const cacheKey = `session_${sessionId}`;
     const cachedSession = await cacheService.get(cacheKey);
-    
+
     if (cachedSession) {
-      await cacheService.set(cacheKey, { ...cachedSession, refreshToken }, { ttl: this.SESSION_CACHE_TTL });
+      await cacheService.set(
+        cacheKey,
+        { ...cachedSession, refreshToken },
+        { ttl: this.SESSION_CACHE_TTL }
+      );
     }
   }
 
@@ -1160,19 +1173,23 @@ export class AuthenticationService {
     // Update cache
     const cacheKey = `session_${sessionId}`;
     const cachedSession = await cacheService.get(cacheKey);
-    
+
     if (cachedSession) {
-      await cacheService.set(cacheKey, { ...cachedSession, ...updates }, { ttl: this.SESSION_CACHE_TTL });
+      await cacheService.set(
+        cacheKey,
+        { ...cachedSession, ...updates },
+        { ttl: this.SESSION_CACHE_TTL }
+      );
     }
   }
 
   private async markPlatformVerified(uid: string, platform: string): Promise<void> {
     const userProfile = await this.getUserAuthProfile(uid);
-    
+
     const platformIndex = userProfile.platforms.findIndex(p => p.platform === platform);
     if (platformIndex !== -1) {
       userProfile.platforms[platformIndex].verified = true;
-      
+
       await this.updateUserAuthProfile(uid, { platforms: userProfile.platforms });
     }
   }
@@ -1188,21 +1205,22 @@ export class AuthenticationService {
 
   private async addTrustedDevice(uid: string, deviceInfo: DeviceInfo): Promise<void> {
     const userProfile = await this.getUserAuthProfile(uid);
-    
+
     const trustedDevice: TrustedDevice = {
       deviceId: deviceInfo.deviceId,
       deviceName: `${deviceInfo.deviceType} - ${deviceInfo.os}`,
       addedAt: new Date().toISOString(),
       lastUsed: new Date().toISOString(),
-      fingerprint: crypto.createHash('sha256').update(
-        `${deviceInfo.deviceId}${deviceInfo.os}${deviceInfo.browser || ''}`
-      ).digest('hex'),
+      fingerprint: crypto
+        .createHash('sha256')
+        .update(`${deviceInfo.deviceId}${deviceInfo.os}${deviceInfo.browser || ''}`)
+        .digest('hex'),
     };
 
     userProfile.securitySettings.trustedDevices.push(trustedDevice);
-    
-    await this.updateUserAuthProfile(uid, { 
-      securitySettings: userProfile.securitySettings 
+
+    await this.updateUserAuthProfile(uid, {
+      securitySettings: userProfile.securitySettings,
     });
   }
 
@@ -1226,7 +1244,7 @@ export class AuthenticationService {
 
   private async checkRateLimit(identifier: string, ipAddress: string): Promise<void> {
     const rateLimitKey = `rate_limit_${identifier}_${ipAddress}`;
-    const attempts = await cacheService.get(rateLimitKey) || 0;
+    const attempts = (await cacheService.get(rateLimitKey)) || 0;
 
     if (attempts >= this.MAX_LOGIN_ATTEMPTS) {
       throw createAuthError('Too many login attempts. Please try again later.');
@@ -1235,8 +1253,8 @@ export class AuthenticationService {
 
   private async recordFailedLogin(identifier: string, ipAddress: string): Promise<void> {
     const rateLimitKey = `rate_limit_${identifier}_${ipAddress}`;
-    const attempts = await cacheService.get(rateLimitKey) || 0;
-    
+    const attempts = (await cacheService.get(rateLimitKey)) || 0;
+
     await cacheService.set(rateLimitKey, attempts + 1, { ttl: this.LOCKOUT_DURATION });
   }
 
@@ -1257,7 +1275,7 @@ export class AuthenticationService {
 
   private getDefaultPermissions(platform: string): string[] {
     const basePermissions = ['read_profile', 'update_profile'];
-    
+
     switch (platform) {
       case 'whatsapp':
         return [...basePermissions, 'send_messages', 'receive_messages'];
@@ -1275,4 +1293,3 @@ export class AuthenticationService {
 
 // Global authentication service instance
 export const authenticationService = new AuthenticationService();
-

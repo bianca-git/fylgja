@@ -21,7 +21,7 @@ export {
   maintenanceScheduler,
   proactiveEngagementScheduler,
   schedulerHealthCheck,
-  manualTaskTrigger
+  manualTaskTrigger,
 } from './scheduler/cloud-scheduler-functions';
 
 // Utility Functions
@@ -31,4 +31,3 @@ export { healthCheckHandler } from './monitoring/health-api';
 // Development and Testing Functions
 export { testDataGenerator } from './testing/test-data-generator';
 export { integrationTestRunner } from './testing/integration-test-runner';
-

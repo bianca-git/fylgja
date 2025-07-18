@@ -4,8 +4,9 @@
  * Includes error handling, rate limiting, and usage monitoring
  */
 
-import { GoogleGenerativeAI, GenerativeModel, GenerationConfig } from '@google/generative-ai';
 import { performance } from 'perf_hooks';
+
+import { GoogleGenerativeAI, GenerativeModel, GenerationConfig } from '@google/generative-ai';
 
 import { DatabaseService } from './database-service';
 
@@ -61,7 +62,7 @@ export class GoogleAIService {
   private dbService: DatabaseService;
   private usageMetrics: Map<string, UsageMetrics> = new Map();
   private rateLimiter: Map<string, number[]> = new Map();
-  
+
   // Configuration
   private readonly MAX_REQUESTS_PER_MINUTE = 60;
   private readonly MAX_TOKENS_PER_REQUEST = 8192;
@@ -76,7 +77,7 @@ export class GoogleAIService {
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ 
+    this.model = this.genAI.getGenerativeModel({
       model: 'gemini-1.5-flash',
       generationConfig: this.getDefaultGenerationConfig(),
     });
@@ -135,10 +136,9 @@ export class GoogleAIService {
       await this.logRequest(request, aiResponse, null);
 
       return aiResponse;
-
     } catch (error) {
       const processingTime = performance.now() - startTime;
-      
+
       // Update error metrics
       this.updateUsageMetrics(request.userId, 0, processingTime, true);
 
@@ -194,7 +194,7 @@ export class GoogleAIService {
     }
 
     // Build conversation history
-    const historyContext = conversationHistory 
+    const historyContext = conversationHistory
       ? this.formatConversationHistory(conversationHistory)
       : '';
 
@@ -217,7 +217,10 @@ Please respond as Fylgja, keeping in mind the user's communication style and pre
   /**
    * Process and analyze AI response
    */
-  private async processResponse(text: string, request: AIRequest): Promise<{
+  private async processResponse(
+    text: string,
+    request: AIRequest
+  ): Promise<{
     response: string;
     confidence: number;
     sentiment?: any;
@@ -225,10 +228,10 @@ Please respond as Fylgja, keeping in mind the user's communication style and pre
   }> {
     // Basic response processing
     let processedText = text.trim();
-    
+
     // Remove any unwanted formatting
     processedText = processedText.replace(/^\*\*|\*\*$/g, '');
-    
+
     // Calculate confidence based on response characteristics
     const confidence = this.calculateConfidence(processedText, request);
 
@@ -274,10 +277,10 @@ Required JSON format:
 
       const result = await this.model.generateContent(sentimentPrompt);
       const response = result.response.text();
-      
+
       // Parse JSON response
       const sentimentData = JSON.parse(response.replace(/```json|```/g, ''));
-      
+
       return {
         sentiment: sentimentData.sentiment || 'neutral',
         confidence: sentimentData.confidence || 0.5,
@@ -296,7 +299,10 @@ Required JSON format:
   /**
    * Extract actionable suggestions from response
    */
-  private extractSuggestions(response: string, request: AIRequest): {
+  private extractSuggestions(
+    response: string,
+    request: AIRequest
+  ): {
     tasks: string[];
     questions: string[];
     actions: string[];
@@ -309,15 +315,19 @@ Required JSON format:
 
     // Simple extraction logic (can be enhanced with more AI processing)
     const lines = response.split('\n');
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
-      
+
       if (trimmed.includes('task') || trimmed.includes('todo') || trimmed.includes('do')) {
         suggestions.tasks.push(trimmed);
       } else if (trimmed.includes('?')) {
         suggestions.questions.push(trimmed);
-      } else if (trimmed.includes('try') || trimmed.includes('consider') || trimmed.includes('might')) {
+      } else if (
+        trimmed.includes('try') ||
+        trimmed.includes('consider') ||
+        trimmed.includes('might')
+      ) {
         suggestions.actions.push(trimmed);
       }
     }
@@ -332,16 +342,28 @@ Required JSON format:
     let confidence = 0.8; // Base confidence
 
     // Adjust based on response length
-    if (response.length < 50) confidence -= 0.1;
-    if (response.length > 500) confidence += 0.1;
+    if (response.length < 50) {
+      confidence -= 0.1;
+    }
+    if (response.length > 500) {
+      confidence += 0.1;
+    }
 
     // Adjust based on request type
-    if (request.requestType === 'sentiment_analysis') confidence += 0.1;
-    if (request.requestType === 'checkin') confidence += 0.05;
+    if (request.requestType === 'sentiment_analysis') {
+      confidence += 0.1;
+    }
+    if (request.requestType === 'checkin') {
+      confidence += 0.05;
+    }
 
     // Adjust based on context availability
-    if (request.context) confidence += 0.05;
-    if (request.conversationHistory?.length > 0) confidence += 0.05;
+    if (request.context) {
+      confidence += 0.05;
+    }
+    if (request.conversationHistory?.length > 0) {
+      confidence += 0.05;
+    }
 
     return Math.min(Math.max(confidence, 0.1), 1.0);
   }
@@ -406,14 +428,16 @@ Be accurate and nuanced in your analysis.`;
   }
 
   private getDefaultSystemPrompt(): string {
-    return `You are Fylgja, a supportive AI companion. Respond helpfully and empathetically to the user's message.`;
+    return "You are Fylgja, a supportive AI companion. Respond helpfully and empathetically to the user's message.";
   }
 
   /**
    * Build user context from profile and history
    */
   private buildUserContext(userProfile: any, recentInteractions: any[]): string {
-    if (!userProfile) return '';
+    if (!userProfile) {
+      return '';
+    }
 
     let context = `User Profile:
 - Name: ${userProfile.name || 'User'}
@@ -421,7 +445,7 @@ Be accurate and nuanced in your analysis.`;
 - Preferences: ${userProfile.preferences ? JSON.stringify(userProfile.preferences) : 'None specified'}`;
 
     if (recentInteractions.length > 0) {
-      context += `\n\nRecent Interaction Patterns:`;
+      context += '\n\nRecent Interaction Patterns:';
       recentInteractions.forEach((interaction, index) => {
         context += `\n${index + 1}. ${interaction.timestamp}: ${interaction.userMessage?.substring(0, 100)}...`;
       });
@@ -438,7 +462,9 @@ Be accurate and nuanced in your analysis.`;
   }
 
   private buildConversationContext(history: ConversationMessage[]): string {
-    if (!history || history.length === 0) return '';
+    if (!history || history.length === 0) {
+      return '';
+    }
 
     let context = 'Recent conversation:\n';
     history.slice(-5).forEach(msg => {
@@ -458,14 +484,14 @@ Be accurate and nuanced in your analysis.`;
   private async checkRateLimit(userId: string): Promise<void> {
     const now = Date.now();
     const userRequests = this.rateLimiter.get(userId) || [];
-    
+
     // Remove requests older than 1 minute
     const recentRequests = userRequests.filter(time => now - time < 60000);
-    
+
     if (recentRequests.length >= this.MAX_REQUESTS_PER_MINUTE) {
       throw new Error('Rate limit exceeded. Please wait before making another request.');
     }
-    
+
     recentRequests.push(now);
     this.rateLimiter.set(userId, recentRequests);
   }
@@ -478,14 +504,21 @@ Be accurate and nuanced in your analysis.`;
       throw new Error('Prompt is required');
     }
     if (request.prompt.length > this.MAX_TOKENS_PER_REQUEST) {
-      throw new Error(`Prompt too long. Maximum ${this.MAX_TOKENS_PER_REQUEST} characters allowed.`);
+      throw new Error(
+        `Prompt too long. Maximum ${this.MAX_TOKENS_PER_REQUEST} characters allowed.`
+      );
     }
   }
 
   /**
    * Usage tracking and metrics
    */
-  private updateUsageMetrics(userId: string, tokens: number, responseTime: number, isError: boolean): void {
+  private updateUsageMetrics(
+    userId: string,
+    tokens: number,
+    responseTime: number,
+    isError: boolean
+  ): void {
     const current = this.usageMetrics.get(userId) || {
       requestCount: 0,
       totalTokens: 0,
@@ -496,10 +529,13 @@ Be accurate and nuanced in your analysis.`;
 
     current.requestCount++;
     current.totalTokens += tokens;
-    current.averageResponseTime = (current.averageResponseTime * (current.requestCount - 1) + responseTime) / current.requestCount;
-    
+    current.averageResponseTime =
+      (current.averageResponseTime * (current.requestCount - 1) + responseTime) /
+      current.requestCount;
+
     if (isError) {
-      current.errorRate = (current.errorRate * (current.requestCount - 1) + 1) / current.requestCount;
+      current.errorRate =
+        (current.errorRate * (current.requestCount - 1) + 1) / current.requestCount;
     } else {
       current.errorRate = (current.errorRate * (current.requestCount - 1)) / current.requestCount;
     }
@@ -510,7 +546,11 @@ Be accurate and nuanced in your analysis.`;
   /**
    * Logging and monitoring
    */
-  private async logRequest(request: AIRequest, response: AIResponse | null, error: Error | null): Promise<void> {
+  private async logRequest(
+    request: AIRequest,
+    response: AIResponse | null,
+    error: Error | null
+  ): Promise<void> {
     try {
       const logData = {
         timestamp: new Date().toISOString(),
@@ -574,13 +614,13 @@ Be accurate and nuanced in your analysis.`;
     overallErrorRate: number;
   } {
     const metrics = Array.from(this.usageMetrics.values());
-    
+
     return {
       totalUsers: metrics.length,
       totalRequests: metrics.reduce((sum, m) => sum + m.requestCount, 0),
-      averageResponseTime: metrics.reduce((sum, m) => sum + m.averageResponseTime, 0) / metrics.length || 0,
+      averageResponseTime:
+        metrics.reduce((sum, m) => sum + m.averageResponseTime, 0) / metrics.length || 0,
       overallErrorRate: metrics.reduce((sum, m) => sum + m.errorRate, 0) / metrics.length || 0,
     };
   }
 }
-

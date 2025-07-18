@@ -3,11 +3,11 @@
  * Handles creation, scheduling, management, and delivery of personalized reminders
  */
 
+import { RedisCacheService } from '../cache/redis-cache-service';
+import { ResponsePersonalizer } from '../personalization/response-personalizer';
 import { EnhancedDatabaseService } from '../services/enhanced-database-service';
 import { GoogleAIService } from '../services/google-ai-service';
-import { ResponsePersonalizer } from '../personalization/response-personalizer';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
-import { RedisCacheService } from '../cache/redis-cache-service';
 
 export interface Reminder {
   id: string;
@@ -155,7 +155,7 @@ export class ReminderSystem {
       console.log('Creating new reminder', {
         userId: reminderData.userId,
         title: reminderData.title,
-        scheduledTime: reminderData.scheduledTime
+        scheduledTime: reminderData.scheduledTime,
       });
 
       // Validate reminder data
@@ -180,16 +180,18 @@ export class ReminderSystem {
         location: reminderData.location,
         context: reminderData.context || {},
         delivery: {
-          channels: reminderData.delivery?.channels || await this.getDefaultDeliveryChannels(reminderData.userId!),
+          channels:
+            reminderData.delivery?.channels ||
+            (await this.getDefaultDeliveryChannels(reminderData.userId!)),
           advanceNotifications: reminderData.delivery?.advanceNotifications || [],
           customMessage: reminderData.delivery?.customMessage,
-          tone: reminderData.delivery?.tone || 'friendly'
+          tone: reminderData.delivery?.tone || 'friendly',
         },
         status: 'active',
         createdAt: new Date(),
         updatedAt: new Date(),
         createdBy: reminderData.createdBy || 'user',
-        metadata: reminderData.metadata || {}
+        metadata: reminderData.metadata || {},
       };
 
       // Enhance reminder with AI suggestions if enabled
@@ -207,7 +209,7 @@ export class ReminderSystem {
       await this.trackReminderEvent(reminder.id, 'created', {
         priority: reminder.priority,
         category: reminder.category,
-        hasRecurrence: !!reminder.recurrence
+        hasRecurrence: !!reminder.recurrence,
       });
 
       // Learn from user patterns
@@ -216,21 +218,20 @@ export class ReminderSystem {
       console.log('Reminder created successfully', {
         reminderId: reminder.id,
         scheduledTime: reminder.scheduledTime,
-        channels: reminder.delivery.channels.length
+        channels: reminder.delivery.channels.length,
       });
 
       return reminder;
-
     } catch (error) {
       console.error('Failed to create reminder', {
         userId: reminderData.userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.VALIDATION_ERROR,
         message: 'Failed to create reminder',
-        context: { userId: reminderData.userId, error: error.message }
+        context: { userId: reminderData.userId, error: error.message },
       });
     }
   }
@@ -248,7 +249,7 @@ export class ReminderSystem {
         throw new FylgjaError({
           type: ErrorType.NOT_FOUND,
           message: 'Reminder not found',
-          context: { reminderId }
+          context: { reminderId },
         });
       }
 
@@ -261,7 +262,7 @@ export class ReminderSystem {
       const updatedReminder: Reminder = {
         ...existingReminder,
         ...updates,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       // Re-enhance with AI if significant changes
@@ -280,14 +281,13 @@ export class ReminderSystem {
       console.log('Reminder updated successfully', { reminderId });
 
       return updatedReminder;
-
     } catch (error) {
       console.error('Failed to update reminder', { reminderId, error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to update reminder',
-        context: { reminderId, error: error.message }
+        context: { reminderId, error: error.message },
       });
     }
   }
@@ -305,7 +305,7 @@ export class ReminderSystem {
         throw new FylgjaError({
           type: ErrorType.NOT_FOUND,
           message: 'Reminder not found',
-          context: { reminderId }
+          context: { reminderId },
         });
       }
 
@@ -315,23 +315,22 @@ export class ReminderSystem {
       // Mark as cancelled in database
       await this.databaseService.updateReminder(reminderId, {
         status: 'cancelled',
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       // Track analytics
       await this.trackReminderEvent(reminderId, 'cancelled', {
-        wasActive: reminder.status === 'active'
+        wasActive: reminder.status === 'active',
       });
 
       console.log('Reminder deleted successfully', { reminderId });
-
     } catch (error) {
       console.error('Failed to delete reminder', { reminderId, error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to delete reminder',
-        context: { reminderId, error: error.message }
+        context: { reminderId, error: error.message },
       });
     }
   }
@@ -354,7 +353,7 @@ export class ReminderSystem {
       console.log('Getting user reminders', {
         userId,
         filters: filters ? Object.keys(filters) : [],
-        pagination
+        pagination,
       });
 
       const result = await this.databaseService.getUserReminders(userId, filters, pagination);
@@ -362,18 +361,17 @@ export class ReminderSystem {
       console.log('Retrieved user reminders', {
         userId,
         count: result.reminders.length,
-        total: result.total
+        total: result.total,
       });
 
       return result;
-
     } catch (error) {
       console.error('Failed to get user reminders', { userId, error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to get user reminders',
-        context: { userId, error: error.message }
+        context: { userId, error: error.message },
       });
     }
   }
@@ -394,7 +392,7 @@ export class ReminderSystem {
         throw new FylgjaError({
           type: ErrorType.NOT_FOUND,
           message: 'Reminder not found',
-          context: { reminderId }
+          context: { reminderId },
         });
       }
 
@@ -402,27 +400,26 @@ export class ReminderSystem {
       const updatedReminder = await this.updateReminder(reminderId, {
         status: 'snoozed',
         snoozeUntil,
-        scheduledTime: snoozeUntil
+        scheduledTime: snoozeUntil,
       });
 
       // Track analytics
       await this.trackReminderEvent(reminderId, 'snoozed', {
         originalTime: reminder.scheduledTime,
         snoozeUntil,
-        reason
+        reason,
       });
 
       console.log('Reminder snoozed successfully', { reminderId, snoozeUntil });
 
       return updatedReminder;
-
     } catch (error) {
       console.error('Failed to snooze reminder', { reminderId, error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to snooze reminder',
-        context: { reminderId, error: error.message }
+        context: { reminderId, error: error.message },
       });
     }
   }
@@ -443,7 +440,7 @@ export class ReminderSystem {
         throw new FylgjaError({
           type: ErrorType.NOT_FOUND,
           message: 'Reminder not found',
-          context: { reminderId }
+          context: { reminderId },
         });
       }
 
@@ -454,8 +451,8 @@ export class ReminderSystem {
         context: {
           ...reminder.context,
           completionNotes,
-          effectiveness
-        }
+          effectiveness,
+        },
       });
 
       // Handle recurring reminders
@@ -467,7 +464,7 @@ export class ReminderSystem {
       await this.trackReminderEvent(reminderId, 'completed', {
         effectiveness,
         completionNotes,
-        wasOnTime: new Date() <= reminder.scheduledTime
+        wasOnTime: new Date() <= reminder.scheduledTime,
       });
 
       // Learn from completion patterns
@@ -476,14 +473,13 @@ export class ReminderSystem {
       console.log('Reminder completed successfully', { reminderId });
 
       return updatedReminder;
-
     } catch (error) {
       console.error('Failed to complete reminder', { reminderId, error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to complete reminder',
-        context: { reminderId, error: error.message }
+        context: { reminderId, error: error.message },
       });
     }
   }
@@ -506,18 +502,17 @@ export class ReminderSystem {
 
       console.log('Generated smart suggestions', {
         userId,
-        count: rankedSuggestions.length
+        count: rankedSuggestions.length,
       });
 
       return rankedSuggestions;
-
     } catch (error) {
       console.error('Failed to get smart suggestions', { userId, error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to get smart suggestions',
-        context: { userId, error: error.message }
+        context: { userId, error: error.message },
       });
     }
   }
@@ -539,7 +534,7 @@ export class ReminderSystem {
         throw new FylgjaError({
           type: ErrorType.NOT_FOUND,
           message: 'Reminder template not found',
-          context: { templateId }
+          context: { templateId },
         });
       }
 
@@ -553,14 +548,16 @@ export class ReminderSystem {
         recurrence: customizations?.recurrence || template.suggestedRecurrence,
         delivery: {
           ...customizations?.delivery,
-          advanceNotifications: customizations?.delivery?.advanceNotifications || template.suggestedAdvanceNotifications
+          advanceNotifications:
+            customizations?.delivery?.advanceNotifications ||
+            template.suggestedAdvanceNotifications,
         },
         ...customizations,
         metadata: {
           source: 'template',
           templateId,
-          ...customizations?.metadata
-        }
+          ...customizations?.metadata,
+        },
       };
 
       // Create the reminder
@@ -571,22 +568,21 @@ export class ReminderSystem {
 
       console.log('Reminder created from template successfully', {
         reminderId: reminder.id,
-        templateId
+        templateId,
       });
 
       return reminder;
-
     } catch (error) {
       console.error('Failed to create reminder from template', {
         userId,
         templateId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to create reminder from template',
-        context: { userId, templateId, error: error.message }
+        context: { userId, templateId, error: error.message },
       });
     }
   }
@@ -610,20 +606,19 @@ export class ReminderSystem {
         } catch (error) {
           console.error('Failed to deliver reminder', {
             reminderId: reminder.id,
-            error: error.message
+            error: error.message,
           });
         }
       }
 
       console.log('Completed processing due reminders');
-
     } catch (error) {
       console.error('Failed to process due reminders', { error: error.message });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to process due reminders',
-        context: { error: error.message }
+        context: { error: error.message },
       });
     }
   }
@@ -666,7 +661,7 @@ export class ReminderSystem {
     try {
       // Get user's preferred delivery channels from profile
       const userProfile = await this.databaseService.getUserProfile(userId);
-      
+
       if (userProfile?.reminderPreferences?.defaultChannels) {
         return userProfile.reminderPreferences.defaultChannels;
       }
@@ -677,10 +672,9 @@ export class ReminderSystem {
           type: 'whatsapp',
           address: userProfile?.phoneNumber || '',
           enabled: true,
-          priority: 1
-        }
+          priority: 1,
+        },
       ];
-
     } catch (error) {
       // Fallback to basic channel
       return [
@@ -688,8 +682,8 @@ export class ReminderSystem {
           type: 'push',
           address: userId,
           enabled: true,
-          priority: 1
-        }
+          priority: 1,
+        },
       ];
     }
   }
@@ -714,13 +708,13 @@ export class ReminderSystem {
         prompt: enhancementPrompt,
         context: {
           userId: reminder.userId,
-          type: 'reminder_enhancement'
-        }
+          type: 'reminder_enhancement',
+        },
       });
 
       // Parse AI suggestions and apply reasonable enhancements
       const suggestions = this.parseAIEnhancements(aiResponse.response);
-      
+
       return {
         ...reminder,
         description: reminder.description || suggestions.description,
@@ -728,14 +722,13 @@ export class ReminderSystem {
         metadata: {
           ...reminder.metadata,
           aiEnhancements: suggestions,
-          confidence: aiResponse.confidence
-        }
+          confidence: aiResponse.confidence,
+        },
       };
-
     } catch (error) {
       console.warn('Failed to enhance reminder with AI', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
 
       // Return original reminder if AI enhancement fails
@@ -749,7 +742,7 @@ export class ReminderSystem {
     return {
       description: '',
       tags: [],
-      suggestions: aiResponse
+      suggestions: aiResponse,
     };
   }
 
@@ -758,7 +751,7 @@ export class ReminderSystem {
     return {
       ...reminder.metadata,
       lastUpdated: new Date(),
-      updateCount: (reminder.metadata.updateCount || 0) + 1
+      updateCount: (reminder.metadata.updateCount || 0) + 1,
     };
   }
 
@@ -766,7 +759,7 @@ export class ReminderSystem {
     // Schedule reminder for delivery using Cloud Scheduler or similar
     console.log('Scheduling reminder delivery', {
       reminderId: reminder.id,
-      scheduledTime: reminder.scheduledTime
+      scheduledTime: reminder.scheduledTime,
     });
 
     // Implementation would integrate with Cloud Scheduler
@@ -790,7 +783,7 @@ export class ReminderSystem {
     try {
       console.log('Delivering reminder', {
         reminderId: reminder.id,
-        channels: reminder.delivery.channels.length
+        channels: reminder.delivery.channels.length,
       });
 
       // Generate personalized message
@@ -806,15 +799,14 @@ export class ReminderSystem {
       // Track delivery
       await this.trackReminderEvent(reminder.id, 'delivered', {
         channels: reminder.delivery.channels.map(c => c.type),
-        messageLength: message.length
+        messageLength: message.length,
       });
 
       console.log('Reminder delivered successfully', { reminderId: reminder.id });
-
     } catch (error) {
       console.error('Failed to deliver reminder', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
 
       throw error;
@@ -843,12 +835,11 @@ export class ReminderSystem {
         context: {
           type: 'reminder',
           priority: reminder.priority,
-          category: reminder.category
-        }
+          category: reminder.category,
+        },
       });
 
       return response.personalizedResponse;
-
     } catch (error) {
       // Fallback to simple message
       return `Reminder: ${reminder.title}${reminder.description ? '\n' + reminder.description : ''}`;
@@ -864,7 +855,7 @@ export class ReminderSystem {
       console.log('Delivering through channel', {
         reminderId: reminder.id,
         channelType: channel.type,
-        address: channel.address
+        address: channel.address,
       });
 
       // Implementation would integrate with actual delivery services
@@ -872,7 +863,7 @@ export class ReminderSystem {
       console.log('Reminder delivery', {
         channel: channel.type,
         address: channel.address,
-        message: message.substring(0, 100) + '...'
+        message: message.substring(0, 100) + '...',
       });
 
       // In a real implementation, this would call:
@@ -881,12 +872,11 @@ export class ReminderSystem {
       // - SendGrid for email
       // - Firebase Cloud Messaging for push notifications
       // - Google Assistant for voice/smart display
-
     } catch (error) {
       console.error('Failed to deliver through channel', {
         reminderId: reminder.id,
         channelType: channel.type,
-        error: error.message
+        error: error.message,
       });
 
       throw error;
@@ -894,7 +884,9 @@ export class ReminderSystem {
   }
 
   private async createNextRecurringReminder(reminder: Reminder): Promise<void> {
-    if (!reminder.recurrence) return;
+    if (!reminder.recurrence) {
+      return;
+    }
 
     try {
       // Calculate next occurrence
@@ -903,7 +895,9 @@ export class ReminderSystem {
         reminder.recurrence
       );
 
-      if (!nextScheduledTime) return; // No more occurrences
+      if (!nextScheduledTime) {
+        return;
+      } // No more occurrences
 
       // Create next reminder
       const nextReminder: Partial<Reminder> = {
@@ -919,29 +913,25 @@ export class ReminderSystem {
         metadata: {
           ...reminder.metadata,
           parentReminderId: reminder.id,
-          recurrenceInstance: (reminder.metadata.recurrenceInstance || 0) + 1
-        }
+          recurrenceInstance: (reminder.metadata.recurrenceInstance || 0) + 1,
+        },
       };
 
       await this.createReminder(nextReminder);
 
       console.log('Created next recurring reminder', {
         originalId: reminder.id,
-        nextScheduledTime
+        nextScheduledTime,
       });
-
     } catch (error) {
       console.error('Failed to create next recurring reminder', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
     }
   }
 
-  private calculateNextOccurrence(
-    currentTime: Date,
-    recurrence: RecurrencePattern
-  ): Date | null {
+  private calculateNextOccurrence(currentTime: Date, recurrence: RecurrencePattern): Date | null {
     const nextTime = new Date(currentTime);
 
     switch (recurrence.type) {
@@ -949,7 +939,7 @@ export class ReminderSystem {
         nextTime.setDate(nextTime.getDate() + recurrence.interval);
         break;
       case 'weekly':
-        nextTime.setDate(nextTime.getDate() + (recurrence.interval * 7));
+        nextTime.setDate(nextTime.getDate() + recurrence.interval * 7);
         break;
       case 'monthly':
         nextTime.setMonth(nextTime.getMonth() + recurrence.interval);
@@ -969,27 +959,22 @@ export class ReminderSystem {
     return nextTime;
   }
 
-  private async trackReminderEvent(
-    reminderId: string,
-    event: string,
-    context: any
-  ): Promise<void> {
+  private async trackReminderEvent(reminderId: string, event: string, context: any): Promise<void> {
     try {
       const analytics: ReminderAnalytics = {
         userId: '', // Will be filled from reminder
         reminderId,
         event: event as any,
         timestamp: new Date(),
-        context
+        context,
       };
 
       await this.databaseService.storeReminderAnalytics(analytics);
-
     } catch (error) {
       console.warn('Failed to track reminder event', {
         reminderId,
         event,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -998,21 +983,26 @@ export class ReminderSystem {
     // Update user's reminder patterns for learning
     try {
       const patterns = await this.databaseService.getUserReminderPatterns(reminder.userId);
-      
+
       // Update patterns based on new reminder
       const updatedPatterns = {
         ...patterns,
-        preferredCategories: this.updateCategoryPreferences(patterns.preferredCategories, reminder.category),
+        preferredCategories: this.updateCategoryPreferences(
+          patterns.preferredCategories,
+          reminder.category
+        ),
         preferredTimes: this.updateTimePreferences(patterns.preferredTimes, reminder.scheduledTime),
-        preferredPriorities: this.updatePriorityPreferences(patterns.preferredPriorities, reminder.priority)
+        preferredPriorities: this.updatePriorityPreferences(
+          patterns.preferredPriorities,
+          reminder.priority
+        ),
       };
 
       await this.databaseService.updateUserReminderPatterns(reminder.userId, updatedPatterns);
-
     } catch (error) {
       console.warn('Failed to update user reminder patterns', {
         userId: reminder.userId,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -1020,7 +1010,7 @@ export class ReminderSystem {
   private updateCategoryPreferences(current: any, category: string): any {
     return {
       ...current,
-      [category]: (current[category] || 0) + 1
+      [category]: (current[category] || 0) + 1,
     };
   }
 
@@ -1028,14 +1018,14 @@ export class ReminderSystem {
     const hour = scheduledTime.getHours();
     return {
       ...current,
-      [hour]: (current[hour] || 0) + 1
+      [hour]: (current[hour] || 0) + 1,
     };
   }
 
   private updatePriorityPreferences(current: any, priority: string): any {
     return {
       ...current,
-      [priority]: (current[priority] || 0) + 1
+      [priority]: (current[priority] || 0) + 1,
     };
   }
 
@@ -1048,13 +1038,12 @@ export class ReminderSystem {
       return {
         patterns,
         recentActivity: recentReminders,
-        insights: this.generatePatternInsights(patterns, recentReminders)
+        insights: this.generatePatternInsights(patterns, recentReminders),
       };
-
     } catch (error) {
       console.warn('Failed to analyze user reminder patterns', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       return { patterns: {}, recentActivity: [], insights: [] };
@@ -1081,7 +1070,7 @@ export class ReminderSystem {
       return acc;
     }, {});
 
-    const bestHour = Object.keys(hourCounts).reduce((a, b) => 
+    const bestHour = Object.keys(hourCounts).reduce((a, b) =>
       hourCounts[a] > hourCounts[b] ? a : b
     );
 
@@ -1092,7 +1081,10 @@ export class ReminderSystem {
     return insights;
   }
 
-  private async generateSmartSuggestions(userId: string, patterns: any): Promise<SmartSuggestion[]> {
+  private async generateSmartSuggestions(
+    userId: string,
+    patterns: any
+  ): Promise<SmartSuggestion[]> {
     try {
       const suggestions: SmartSuggestion[] = [];
 
@@ -1107,8 +1099,8 @@ export class ReminderSystem {
         prompt: suggestionPrompt,
         context: {
           userId,
-          type: 'reminder_suggestions'
-        }
+          type: 'reminder_suggestions',
+        },
       });
 
       // Parse AI suggestions (simplified)
@@ -1124,25 +1116,24 @@ export class ReminderSystem {
             description: suggestion.description,
             confidence: aiResponse.confidence || 0.7,
             reasoning: suggestion.reasoning,
-            suggestedReminder: suggestion.reminder
+            suggestedReminder: suggestion.reminder,
           },
           basedOn: {
             patterns: patterns.insights,
             data: patterns.patterns,
-            timeframe: 'last_30_days'
+            timeframe: 'last_30_days',
           },
           status: 'pending',
           createdAt: new Date(),
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         });
       }
 
       return suggestions;
-
     } catch (error) {
       console.warn('Failed to generate smart suggestions', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       return [];
@@ -1159,18 +1150,24 @@ export class ReminderSystem {
         reminder: {
           category: 'personal',
           priority: 'medium',
-          recurrence: { type: 'daily', interval: 1 }
-        }
-      }
+          recurrence: { type: 'daily', interval: 1 },
+        },
+      },
     ];
   }
 
-  private async rankSuggestions(suggestions: SmartSuggestion[], patterns: any): Promise<SmartSuggestion[]> {
+  private async rankSuggestions(
+    suggestions: SmartSuggestion[],
+    patterns: any
+  ): Promise<SmartSuggestion[]> {
     // Rank suggestions based on relevance and user patterns
     return suggestions.sort((a, b) => b.suggestion.confidence - a.suggestion.confidence);
   }
 
-  private async learnFromReminderCompletion(reminder: Reminder, effectiveness?: number): Promise<void> {
+  private async learnFromReminderCompletion(
+    reminder: Reminder,
+    effectiveness?: number
+  ): Promise<void> {
     try {
       // Learn from successful reminder completion
       const learningData = {
@@ -1180,17 +1177,15 @@ export class ReminderSystem {
         scheduledHour: reminder.scheduledTime.getHours(),
         dayOfWeek: reminder.scheduledTime.getDay(),
         effectiveness: effectiveness || 3,
-        completedOnTime: new Date() <= reminder.scheduledTime
+        completedOnTime: new Date() <= reminder.scheduledTime,
       };
 
       await this.databaseService.storeReminderLearning(reminder.userId, learningData);
-
     } catch (error) {
       console.warn('Failed to learn from reminder completion', {
         reminderId: reminder.id,
-        error: error.message
+        error: error.message,
       });
     }
   }
 }
-

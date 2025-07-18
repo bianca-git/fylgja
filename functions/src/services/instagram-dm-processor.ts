@@ -1,16 +1,17 @@
 /**
  * Instagram DM Processor for Fylgja
  * Handles processing of incoming Instagram Direct Messages
- * 
+ *
  * PLACEHOLDER IMPLEMENTATION - Ready for development
  */
 
+import { RedisCacheService } from '../cache/redis-cache-service';
 import { CoreProcessor } from '../core/core-processor';
-import { InstagramGraphService } from './instagram-graph-service';
-import { EnhancedDatabaseService } from './enhanced-database-service';
 import { ResponsePersonalizer } from '../personalization/response-personalizer';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
-import { RedisCacheService } from '../cache/redis-cache-service';
+
+import { EnhancedDatabaseService } from './enhanced-database-service';
+import { InstagramGraphService } from './instagram-graph-service';
 
 export interface InstagramDMEvent {
   sender: { id: string };
@@ -83,7 +84,9 @@ export class InstagramDMProcessor {
   /**
    * Process Instagram DM messaging event
    */
-  public async processMessagingEvent(event: InstagramDMEvent): Promise<InstagramDMProcessingResult> {
+  public async processMessagingEvent(
+    event: InstagramDMEvent
+  ): Promise<InstagramDMProcessingResult> {
     const startTime = Date.now();
 
     try {
@@ -91,10 +94,10 @@ export class InstagramDMProcessor {
         senderId: event.sender.id,
         messageId: event.message?.mid,
         hasText: !!event.message?.text,
-        hasAttachments: !!(event.message?.attachments?.length),
+        hasAttachments: !!event.message?.attachments?.length,
         hasStoryMention: !!event.message?.story_mention,
         hasPostback: !!event.postback,
-        requestId: event.requestId
+        requestId: event.requestId,
       });
 
       // Handle different event types
@@ -109,7 +112,7 @@ export class InstagramDMProcessor {
       } else {
         console.warn('Unknown Instagram DM event type', {
           event,
-          requestId: event.requestId
+          requestId: event.requestId,
         });
 
         return {
@@ -117,15 +120,14 @@ export class InstagramDMProcessor {
           messageId: 'unknown',
           responseGenerated: false,
           processingTime: Date.now() - startTime,
-          metadata: { eventType: 'unknown' }
+          metadata: { eventType: 'unknown' },
         };
       }
-
     } catch (error) {
       console.error('Failed to process Instagram DM event', {
         senderId: event.sender.id,
         error: error.message,
-        requestId: event.requestId
+        requestId: event.requestId,
       });
 
       return {
@@ -133,7 +135,7 @@ export class InstagramDMProcessor {
         messageId: event.message?.mid || 'unknown',
         responseGenerated: false,
         processingTime: Date.now() - startTime,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -141,7 +143,10 @@ export class InstagramDMProcessor {
   /**
    * Process incoming Instagram DM message
    */
-  private async processMessage(event: InstagramDMEvent, startTime: number): Promise<InstagramDMProcessingResult> {
+  private async processMessage(
+    event: InstagramDMEvent,
+    startTime: number
+  ): Promise<InstagramDMProcessingResult> {
     const messageId = event.message!.mid;
     const senderId = event.sender.id;
 
@@ -162,7 +167,7 @@ export class InstagramDMProcessor {
       attachments: event.message!.attachments,
       storyMention: event.message!.story_mention,
       replyTo: event.message!.reply_to,
-      requestId: event.requestId
+      requestId: event.requestId,
     };
 
     // Process message through core processor
@@ -171,7 +176,7 @@ export class InstagramDMProcessor {
       message: messageContent,
       platform: 'instagram_dm',
       context: messageContext,
-      userProfile: userProfile
+      userProfile: userProfile,
     });
 
     // Personalize response for Instagram DM
@@ -180,7 +185,7 @@ export class InstagramDMProcessor {
       userId: userProfile.id,
       platform: 'instagram_dm',
       context: messageContext,
-      userPreferences: userProfile.preferences
+      userPreferences: userProfile.preferences,
     });
 
     // Send response via Instagram DM
@@ -209,15 +214,17 @@ export class InstagramDMProcessor {
         content: messageContent,
         timestamp: new Date(event.timestamp),
         attachments: event.message!.attachments,
-        storyMention: event.message!.story_mention
+        storyMention: event.message!.story_mention,
       },
-      outgoingMessage: responseGenerated ? {
-        messageId: responseMessageId!,
-        content: personalizedResponse.content!,
-        timestamp: new Date()
-      } : null,
+      outgoingMessage: responseGenerated
+        ? {
+            messageId: responseMessageId!,
+            content: personalizedResponse.content!,
+            timestamp: new Date(),
+          }
+        : null,
       context: messageContext,
-      coreResponse: coreResponse
+      coreResponse: coreResponse,
     });
 
     // Update user engagement metrics
@@ -226,8 +233,8 @@ export class InstagramDMProcessor {
       messageReceived: true,
       responseGenerated,
       processingTime: Date.now() - startTime,
-      hasAttachments: !!(event.message!.attachments?.length),
-      hasStoryMention: !!event.message!.story_mention
+      hasAttachments: !!event.message!.attachments?.length,
+      hasStoryMention: !!event.message!.story_mention,
     });
 
     return {
@@ -240,21 +247,24 @@ export class InstagramDMProcessor {
         userId: userProfile.id,
         coreResponseType: coreResponse.type,
         personalizedResponseType: personalizedResponse.type,
-        hasStoryMention: !!event.message!.story_mention
-      }
+        hasStoryMention: !!event.message!.story_mention,
+      },
     };
   }
 
   /**
    * Process Instagram DM postback event
    */
-  private async processPostback(event: InstagramDMEvent, startTime: number): Promise<InstagramDMProcessingResult> {
+  private async processPostback(
+    event: InstagramDMEvent,
+    startTime: number
+  ): Promise<InstagramDMProcessingResult> {
     // PLACEHOLDER: Implement postback processing
     console.log('Processing Instagram DM postback (PLACEHOLDER)', {
       senderId: event.sender.id,
       payload: event.postback!.payload,
       title: event.postback!.title,
-      requestId: event.requestId
+      requestId: event.requestId,
     });
 
     return {
@@ -262,19 +272,22 @@ export class InstagramDMProcessor {
       messageId: `postback-${event.timestamp}`,
       responseGenerated: false,
       processingTime: Date.now() - startTime,
-      metadata: { eventType: 'postback', payload: event.postback!.payload }
+      metadata: { eventType: 'postback', payload: event.postback!.payload },
     };
   }
 
   /**
    * Process Instagram DM delivery confirmation
    */
-  private async processDelivery(event: InstagramDMEvent, startTime: number): Promise<InstagramDMProcessingResult> {
+  private async processDelivery(
+    event: InstagramDMEvent,
+    startTime: number
+  ): Promise<InstagramDMProcessingResult> {
     // PLACEHOLDER: Implement delivery processing
     console.log('Processing Instagram DM delivery (PLACEHOLDER)', {
       mids: event.delivery!.mids,
       watermark: event.delivery!.watermark,
-      requestId: event.requestId
+      requestId: event.requestId,
     });
 
     return {
@@ -282,18 +295,21 @@ export class InstagramDMProcessor {
       messageId: `delivery-${event.timestamp}`,
       responseGenerated: false,
       processingTime: Date.now() - startTime,
-      metadata: { eventType: 'delivery', mids: event.delivery!.mids }
+      metadata: { eventType: 'delivery', mids: event.delivery!.mids },
     };
   }
 
   /**
    * Process Instagram DM read confirmation
    */
-  private async processRead(event: InstagramDMEvent, startTime: number): Promise<InstagramDMProcessingResult> {
+  private async processRead(
+    event: InstagramDMEvent,
+    startTime: number
+  ): Promise<InstagramDMProcessingResult> {
     // PLACEHOLDER: Implement read processing
     console.log('Processing Instagram DM read (PLACEHOLDER)', {
       watermark: event.read!.watermark,
-      requestId: event.requestId
+      requestId: event.requestId,
     });
 
     return {
@@ -301,7 +317,7 @@ export class InstagramDMProcessor {
       messageId: `read-${event.timestamp}`,
       responseGenerated: false,
       processingTime: Date.now() - startTime,
-      metadata: { eventType: 'read', watermark: event.read!.watermark }
+      metadata: { eventType: 'read', watermark: event.read!.watermark },
     };
   }
 
@@ -347,7 +363,7 @@ export class InstagramDMProcessor {
       // Check cache first
       const cacheKey = `user_profile:instagram:${instagramId}`;
       const cachedProfile = await this.cacheService.get(cacheKey);
-      
+
       if (cachedProfile) {
         return cachedProfile;
       }
@@ -374,17 +390,17 @@ export class InstagramDMProcessor {
             notificationSettings: {
               dailyCheckIns: true,
               reminders: true,
-              summaries: true
-            }
+              summaries: true,
+            },
           },
           createdAt: new Date(),
-          lastActiveAt: new Date()
+          lastActiveAt: new Date(),
         });
 
         console.log('Created new Instagram DM user profile', {
           userId: userProfile.id,
           instagramId,
-          username: instagramUserInfo.username
+          username: instagramUserInfo.username,
         });
       } else {
         // Update last active time
@@ -395,17 +411,16 @@ export class InstagramDMProcessor {
       await this.cacheService.set(cacheKey, userProfile, 3600); // Cache for 1 hour
 
       return userProfile;
-
     } catch (error) {
       console.error('Failed to get or create user profile', {
         instagramId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to get or create user profile',
-        context: { instagramId, error: error.message }
+        context: { instagramId, error: error.message },
       });
     }
   }
@@ -423,31 +438,30 @@ export class InstagramDMProcessor {
       console.log('Sending Instagram DM response (PLACEHOLDER)', {
         recipientId,
         contentLength: content.length,
-        requestId
+        requestId,
       });
 
       // This would use Instagram Graph API to send the message
       const result = await this.instagramService.sendMessage({
         recipientId,
         message: content,
-        requestId
+        requestId,
       });
 
       return {
         success: true,
-        messageId: result.messageId
+        messageId: result.messageId,
       };
-
     } catch (error) {
       console.error('Failed to send Instagram DM response', {
         recipientId,
         error: error.message,
-        requestId
+        requestId,
       });
 
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -468,25 +482,28 @@ export class InstagramDMProcessor {
             content: conversationData.incomingMessage.content,
             timestamp: conversationData.incomingMessage.timestamp,
             attachments: conversationData.incomingMessage.attachments,
-            storyMention: conversationData.incomingMessage.storyMention
+            storyMention: conversationData.incomingMessage.storyMention,
           },
-          ...(conversationData.outgoingMessage ? [{
-            type: 'outgoing',
-            messageId: conversationData.outgoingMessage.messageId,
-            content: conversationData.outgoingMessage.content,
-            timestamp: conversationData.outgoingMessage.timestamp
-          }] : [])
+          ...(conversationData.outgoingMessage
+            ? [
+                {
+                  type: 'outgoing',
+                  messageId: conversationData.outgoingMessage.messageId,
+                  content: conversationData.outgoingMessage.content,
+                  timestamp: conversationData.outgoingMessage.timestamp,
+                },
+              ]
+            : []),
         ],
         context: conversationData.context,
         coreResponse: conversationData.coreResponse,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
-
     } catch (error) {
       console.error('Failed to store conversation', {
         userId: conversationData.userId,
         messageId: conversationData.incomingMessage.messageId,
-        error: error.message
+        error: error.message,
       });
 
       // Don't throw error for storage failures to avoid blocking message processing
@@ -505,13 +522,12 @@ export class InstagramDMProcessor {
         responseGenerated: engagementData.responseGenerated,
         averageProcessingTime: engagementData.processingTime,
         hasAttachmentInteraction: engagementData.hasAttachments,
-        hasStoryInteraction: engagementData.hasStoryMention
+        hasStoryInteraction: engagementData.hasStoryMention,
       });
-
     } catch (error) {
       console.error('Failed to update user engagement', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       // Don't throw error for metrics failures
@@ -538,11 +554,10 @@ export class InstagramDMProcessor {
           timestamp: new Date().toISOString(),
           placeholder: {
             implemented: false,
-            readyForDevelopment: true
-          }
-        }
+            readyForDevelopment: true,
+          },
+        },
       };
-
     } catch (error) {
       return {
         healthy: false,
@@ -551,11 +566,10 @@ export class InstagramDMProcessor {
           timestamp: new Date().toISOString(),
           placeholder: {
             implemented: false,
-            readyForDevelopment: true
-          }
-        }
+            readyForDevelopment: true,
+          },
+        },
       };
     }
   }
 }
-

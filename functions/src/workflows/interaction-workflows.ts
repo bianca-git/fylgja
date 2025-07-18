@@ -5,8 +5,8 @@
 
 import { CoreProcessor, ProcessingRequest, ProcessingResult } from '../core/core-processor';
 import { DatabaseService } from '../services/database-service';
-import { performanceMonitor } from '../utils/monitoring';
 import { FylgjaError, createValidationError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
 
 export interface WorkflowContext {
   userId: string;
@@ -31,7 +31,7 @@ export interface WorkflowStep {
   onComplete?: (result: ProcessingResult, context: WorkflowContext) => Promise<void>;
 }
 
-export type WorkflowStepType = 
+export type WorkflowStepType =
   | 'question'
   | 'response_processing'
   | 'task_analysis'
@@ -51,7 +51,7 @@ export interface WorkflowDefinition {
   completionCriteria: (context: WorkflowContext) => boolean;
 }
 
-export type WorkflowCategory = 
+export type WorkflowCategory =
   | 'daily_checkin'
   | 'goal_planning'
   | 'reflection_session'
@@ -98,8 +98,8 @@ export class InteractionWorkflowEngine {
    * Start a new workflow
    */
   async startWorkflow(
-    workflowId: string, 
-    userId: string, 
+    workflowId: string,
+    userId: string,
     platform: string,
     sessionId: string,
     initialData?: Record<string, any>
@@ -137,7 +137,7 @@ export class InteractionWorkflowEngine {
   ): Promise<ProcessingResult> {
     const contextKey = `${userId}_${workflowId}`;
     const context = this.activeWorkflows.get(contextKey);
-    
+
     if (!context) {
       throw createValidationError(`No active workflow found: ${workflowId}`);
     }
@@ -200,10 +200,10 @@ export class InteractionWorkflowEngine {
       const nextStepIndex = workflow.steps.findIndex(step => step.stepId === nextStepId);
       if (nextStepIndex !== -1) {
         context.currentStep = nextStepIndex;
-        
+
         // Execute next step
         const nextResult = await this.executeStep(context);
-        
+
         // Combine results
         return {
           ...result,
@@ -250,7 +250,7 @@ export class InteractionWorkflowEngine {
    */
   private async completeWorkflow(context: WorkflowContext): Promise<ProcessingResult> {
     const workflow = this.workflowDefinitions.get(context.workflowId)!;
-    
+
     // Generate summary
     const summaryRequest: ProcessingRequest = {
       userId: context.userId,
@@ -288,14 +288,17 @@ export class InteractionWorkflowEngine {
   /**
    * Get workflow status
    */
-  getWorkflowStatus(userId: string, workflowId: string): {
+  getWorkflowStatus(
+    userId: string,
+    workflowId: string
+  ): {
     active: boolean;
     currentStep?: number;
     totalSteps?: number;
     progress?: number;
   } {
     const context = this.activeWorkflows.get(`${userId}_${workflowId}`);
-    
+
     if (!context) {
       return { active: false };
     }
@@ -345,7 +348,7 @@ export class InteractionWorkflowEngine {
           stepId: 'planning',
           stepType: 'question',
           title: 'Planning',
-          description: 'Ask about tomorrow\'s plans',
+          description: "Ask about tomorrow's plans",
           processingRequest: {
             userId: '',
             requestType: 'generate_question',
@@ -406,7 +409,7 @@ export class InteractionWorkflowEngine {
           priority: 10,
         },
       ],
-      completionCriteria: (context) => context.currentStep >= 6,
+      completionCriteria: context => context.currentStep >= 6,
     });
 
     // Goal Planning Workflow
@@ -503,7 +506,7 @@ export class InteractionWorkflowEngine {
           priority: 7,
         },
       ],
-      completionCriteria: (context) => context.currentStep >= 6,
+      completionCriteria: context => context.currentStep >= 6,
     });
 
     // Reflection Session Workflow
@@ -579,7 +582,7 @@ export class InteractionWorkflowEngine {
           priority: 6,
         },
       ],
-      completionCriteria: (context) => context.currentStep >= 4,
+      completionCriteria: context => context.currentStep >= 4,
     });
   }
 
@@ -619,8 +622,7 @@ export class InteractionWorkflowEngine {
    * Get active workflows for user
    */
   getActiveWorkflows(userId: string): WorkflowContext[] {
-    return Array.from(this.activeWorkflows.values())
-      .filter(context => context.userId === userId);
+    return Array.from(this.activeWorkflows.values()).filter(context => context.userId === userId);
   }
 
   /**
@@ -634,4 +636,3 @@ export class InteractionWorkflowEngine {
 
 // Global workflow engine instance
 export const workflowEngine = new InteractionWorkflowEngine();
-

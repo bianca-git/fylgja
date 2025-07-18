@@ -3,11 +3,11 @@
  * Advanced personalization and analytics for configurable summaries
  */
 
+import { RedisCacheService } from '../cache/redis-cache-service';
+import { AdaptiveLearning } from '../core/adaptive-learning';
 import { EnhancedDatabaseService } from '../services/enhanced-database-service';
 import { GoogleAIService } from '../services/google-ai-service';
-import { AdaptiveLearning } from '../core/adaptive-learning';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
-import { RedisCacheService } from '../cache/redis-cache-service';
 
 export interface PersonalizationProfile {
   userId: string;
@@ -145,7 +145,7 @@ export class SummaryPersonalizationEngine {
       console.log('Personalizing summary content', {
         userId: userProfile.userId,
         communicationStyle: userProfile.communicationStyle.preferredTone,
-        focusAreas: userProfile.contentPreferences.focusAreas
+        focusAreas: userProfile.contentPreferences.focusAreas,
       });
 
       // Analyze user's current context and needs
@@ -208,33 +208,36 @@ export class SummaryPersonalizationEngine {
         actionItems,
         reflectionPrompts,
         motivationalContent,
-        adaptiveRecommendations
+        adaptiveRecommendations,
       };
 
       // Learn from this personalization for future improvements
       if (userProfile.adaptiveSettings.learningEnabled) {
-        await this.updatePersonalizationLearning(userProfile.userId, personalizedContent, contextAnalysis);
+        await this.updatePersonalizationLearning(
+          userProfile.userId,
+          personalizedContent,
+          contextAnalysis
+        );
       }
 
       console.log('Summary content personalized successfully', {
         userId: userProfile.userId,
         sectionsCount: personalizedSections.length,
         highlightsCount: keyHighlights.length,
-        actionItemsCount: actionItems.length
+        actionItemsCount: actionItems.length,
       });
 
       return personalizedContent;
-
     } catch (error) {
       console.error('Failed to personalize summary content', {
         userId: userProfile.userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to personalize summary content',
-        context: { userId: userProfile.userId, error: error.message }
+        context: { userId: userProfile.userId, error: error.message },
       });
     }
   }
@@ -248,7 +251,7 @@ export class SummaryPersonalizationEngine {
         userId: analytics.userId,
         summaryId: analytics.summaryId,
         opened: analytics.engagement.opened,
-        responded: analytics.engagement.responded
+        responded: analytics.engagement.responded,
       });
 
       // Store analytics data
@@ -262,24 +265,23 @@ export class SummaryPersonalizationEngine {
 
       console.log('Summary engagement tracked successfully', {
         userId: analytics.userId,
-        summaryId: analytics.summaryId
+        summaryId: analytics.summaryId,
       });
-
     } catch (error) {
       console.error('Failed to track summary engagement', {
         userId: analytics.userId,
         summaryId: analytics.summaryId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to track summary engagement',
-        context: { 
-          userId: analytics.userId, 
-          summaryId: analytics.summaryId, 
-          error: error.message 
-        }
+        context: {
+          userId: analytics.userId,
+          summaryId: analytics.summaryId,
+          error: error.message,
+        },
       });
     }
   }
@@ -292,14 +294,14 @@ export class SummaryPersonalizationEngine {
       // Check cache first
       const cacheKey = `personalization_profile:${userId}`;
       const cachedProfile = await this.cacheService.get(cacheKey);
-      
+
       if (cachedProfile) {
         return cachedProfile;
       }
 
       // Get from database
       let profile = await this.databaseService.getPersonalizationProfile(userId);
-      
+
       if (!profile) {
         // Create default profile
         profile = await this.createDefaultPersonalizationProfile(userId);
@@ -309,17 +311,16 @@ export class SummaryPersonalizationEngine {
       await this.cacheService.set(cacheKey, profile, 3600); // Cache for 1 hour
 
       return profile;
-
     } catch (error) {
       console.error('Failed to get personalization profile', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to get personalization profile',
-        context: { userId, error: error.message }
+        context: { userId, error: error.message },
       });
     }
   }
@@ -334,13 +335,13 @@ export class SummaryPersonalizationEngine {
     try {
       console.log('Updating personalization profile', {
         userId,
-        updateKeys: Object.keys(updates)
+        updateKeys: Object.keys(updates),
       });
 
       // Update in database
       await this.databaseService.updatePersonalizationProfile(userId, {
         ...updates,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       // Clear cache to force refresh
@@ -348,17 +349,16 @@ export class SummaryPersonalizationEngine {
       await this.cacheService.delete(cacheKey);
 
       console.log('Personalization profile updated successfully', { userId });
-
     } catch (error) {
       console.error('Failed to update personalization profile', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to update personalization profile',
-        context: { userId, error: error.message }
+        context: { userId, error: error.message },
       });
     }
   }
@@ -366,7 +366,10 @@ export class SummaryPersonalizationEngine {
   /**
    * Analyze user context for personalization
    */
-  private async analyzeUserContext(summaryData: any, userProfile: PersonalizationProfile): Promise<any> {
+  private async analyzeUserContext(
+    summaryData: any,
+    userProfile: PersonalizationProfile
+  ): Promise<any> {
     try {
       // Analyze recent behavior patterns
       const recentBehavior = await this.analyzeRecentBehavior(userProfile.userId);
@@ -389,13 +392,12 @@ export class SummaryPersonalizationEngine {
         currentFocus,
         emotionalContext,
         communicationContext,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
-
     } catch (error) {
       console.error('Failed to analyze user context', {
         userId: userProfile.userId,
-        error: error.message
+        error: error.message,
       });
 
       // Return basic context if analysis fails
@@ -404,7 +406,7 @@ export class SummaryPersonalizationEngine {
         currentFocus: userProfile.contentPreferences.focusAreas,
         emotionalContext: { mood: 'neutral', energy: 'medium' },
         communicationContext: userProfile.communicationStyle,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     }
   }
@@ -431,12 +433,11 @@ export class SummaryPersonalizationEngine {
         prompt: greetingPrompt,
         context: {
           userId: userProfile.userId,
-          type: 'personalized_greeting'
-        }
+          type: 'personalized_greeting',
+        },
       });
 
       return response.response;
-
     } catch (error) {
       // Fallback to template-based greeting
       return this.generateTemplateGreeting(summaryData, userProfile, contextAnalysis);
@@ -464,7 +465,7 @@ export class SummaryPersonalizationEngine {
           userProfile,
           contextAnalysis
         );
-        
+
         if (section) {
           sections.push(section);
         }
@@ -489,7 +490,7 @@ export class SummaryPersonalizationEngine {
       highlights.push({
         text: `Completed ${summaryData.goals.completed.length} goal${summaryData.goals.completed.length > 1 ? 's' : ''}`,
         importance: 'high',
-        personalRelevance: this.calculatePersonalRelevance('goals', userProfile)
+        personalRelevance: this.calculatePersonalRelevance('goals', userProfile),
       });
     }
 
@@ -498,7 +499,7 @@ export class SummaryPersonalizationEngine {
       highlights.push({
         text: `Strong engagement with ${summaryData.interactions.engagementScore}% score`,
         importance: 'medium',
-        personalRelevance: this.calculatePersonalRelevance('engagement', userProfile)
+        personalRelevance: this.calculatePersonalRelevance('engagement', userProfile),
       });
     }
 
@@ -507,14 +508,18 @@ export class SummaryPersonalizationEngine {
       highlights.push({
         text: `Excellent consistency at ${summaryData.growthMetrics.consistencyScore}%`,
         importance: 'high',
-        personalRelevance: this.calculatePersonalRelevance('consistency', userProfile)
+        personalRelevance: this.calculatePersonalRelevance('consistency', userProfile),
       });
     }
 
     // Sort by personal relevance and importance
     return highlights.sort((a, b) => {
-      const scoreA = (a.personalRelevance * 0.6) + (a.importance === 'high' ? 0.4 : a.importance === 'medium' ? 0.2 : 0.1);
-      const scoreB = (b.personalRelevance * 0.6) + (b.importance === 'high' ? 0.4 : b.importance === 'medium' ? 0.2 : 0.1);
+      const scoreA =
+        a.personalRelevance * 0.6 +
+        (a.importance === 'high' ? 0.4 : a.importance === 'medium' ? 0.2 : 0.1);
+      const scoreB =
+        b.personalRelevance * 0.6 +
+        (b.importance === 'high' ? 0.4 : b.importance === 'medium' ? 0.2 : 0.1);
       return scoreB - scoreA;
     });
   }
@@ -537,7 +542,7 @@ export class SummaryPersonalizationEngine {
         userProfile,
         contextAnalysis
       );
-      
+
       if (actionItem) {
         actionItems.push(actionItem);
       }
@@ -549,7 +554,7 @@ export class SummaryPersonalizationEngine {
         summaryData.personalizedInsights.strengths[0],
         userProfile
       );
-      
+
       if (strengthAction) {
         actionItems.push(strengthAction);
       }
@@ -574,7 +579,7 @@ export class SummaryPersonalizationEngine {
 
     // Generate prompts based on user's growth patterns and current context
     const promptCategories = ['achievement', 'challenge', 'learning', 'future'];
-    
+
     for (const category of promptCategories) {
       const prompt = await this.generateReflectionPrompt(
         category,
@@ -582,7 +587,7 @@ export class SummaryPersonalizationEngine {
         userProfile,
         contextAnalysis
       );
-      
+
       if (prompt) {
         prompts.push(prompt);
       }
@@ -602,7 +607,7 @@ export class SummaryPersonalizationEngine {
     try {
       const motivationStyle = userProfile.communicationStyle.motivationStyle;
       const currentMood = contextAnalysis.emotionalContext.mood;
-      
+
       const motivationPrompt = `Generate a personalized motivational message based on:
       - Motivation style: ${motivationStyle}
       - Current mood: ${currentMood}
@@ -616,8 +621,8 @@ export class SummaryPersonalizationEngine {
         prompt: motivationPrompt,
         context: {
           userId: userProfile.userId,
-          type: 'motivational_content'
-        }
+          type: 'motivational_content',
+        },
       });
 
       return {
@@ -625,16 +630,15 @@ export class SummaryPersonalizationEngine {
         style: motivationStyle,
         personalizedElements: [
           `Progress score: ${summaryData.growthMetrics.progressScore}`,
-          `Consistency: ${summaryData.growthMetrics.consistencyScore}%`
-        ]
+          `Consistency: ${summaryData.growthMetrics.consistencyScore}%`,
+        ],
       };
-
     } catch (error) {
       // Fallback motivational content
       return {
         message: summaryData.personalizedInsights.motivationalMessage,
         style: userProfile.communicationStyle.motivationStyle,
-        personalizedElements: []
+        personalizedElements: [],
       };
     }
   }
@@ -650,12 +654,14 @@ export class SummaryPersonalizationEngine {
     const recommendations = {
       nextSteps: [],
       focusAreas: [],
-      improvementSuggestions: []
+      improvementSuggestions: [],
     };
 
     // Analyze current trajectory and suggest next steps
     if (summaryData.growthMetrics.engagementTrend === 'increasing') {
-      recommendations.nextSteps.push('Consider setting more ambitious goals to match your growing momentum');
+      recommendations.nextSteps.push(
+        'Consider setting more ambitious goals to match your growing momentum'
+      );
     } else if (summaryData.growthMetrics.engagementTrend === 'decreasing') {
       recommendations.nextSteps.push('Focus on re-establishing consistent daily habits');
     }
@@ -678,14 +684,16 @@ export class SummaryPersonalizationEngine {
   /**
    * Helper methods for personalization
    */
-  private async createDefaultPersonalizationProfile(userId: string): Promise<PersonalizationProfile> {
+  private async createDefaultPersonalizationProfile(
+    userId: string
+  ): Promise<PersonalizationProfile> {
     const defaultProfile: PersonalizationProfile = {
       userId,
       communicationStyle: {
         preferredTone: 'adaptive',
         responseLength: 'adaptive',
         motivationStyle: 'adaptive',
-        feedbackPreference: 'adaptive'
+        feedbackPreference: 'adaptive',
       },
       contentPreferences: {
         focusAreas: ['goals', 'productivity', 'wellness'],
@@ -693,22 +701,22 @@ export class SummaryPersonalizationEngine {
         emphasizePositives: true,
         includeActionItems: true,
         includeReflectionPrompts: true,
-        includeComparisons: true
+        includeComparisons: true,
       },
       learningPatterns: {
         engagementTimes: [],
         responsePatterns: [],
         topicInterests: {},
-        improvementAreas: []
+        improvementAreas: [],
       },
       adaptiveSettings: {
         learningEnabled: true,
         adaptationSpeed: 'medium',
         personalityInsights: {},
-        behaviorPatterns: {}
+        behaviorPatterns: {},
       },
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     // Store default profile
@@ -722,9 +730,12 @@ export class SummaryPersonalizationEngine {
     return interests[topic] || 0.5; // Default relevance of 0.5
   }
 
-  private determineSectionPriority(userProfile: PersonalizationProfile, contextAnalysis: any): string[] {
+  private determineSectionPriority(
+    userProfile: PersonalizationProfile,
+    contextAnalysis: any
+  ): string[] {
     const basePriority = ['overview', 'goals', 'achievements', 'challenges', 'growth'];
-    
+
     // Reorder based on user focus areas and current context
     const focusAreas = userProfile.contentPreferences.focusAreas;
     const currentFocus = contextAnalysis.currentFocus;
@@ -736,16 +747,26 @@ export class SummaryPersonalizationEngine {
     });
   }
 
-  private shouldIncludeSection(sectionType: string, userProfile: PersonalizationProfile, summaryData: any): boolean {
+  private shouldIncludeSection(
+    sectionType: string,
+    userProfile: PersonalizationProfile,
+    summaryData: any
+  ): boolean {
     const preferences = userProfile.contentPreferences;
-    
+
     switch (sectionType) {
       case 'goals':
         return preferences.focusAreas.includes('goals') && summaryData.goals.completed.length > 0;
       case 'achievements':
-        return preferences.focusAreas.includes('achievements') && summaryData.achievements.milestones?.length > 0;
+        return (
+          preferences.focusAreas.includes('achievements') &&
+          summaryData.achievements.milestones?.length > 0
+        );
       case 'challenges':
-        return preferences.focusAreas.includes('challenges') && summaryData.challenges.identified.length > 0;
+        return (
+          preferences.focusAreas.includes('challenges') &&
+          summaryData.challenges.identified.length > 0
+        );
       default:
         return true;
     }
@@ -763,9 +784,13 @@ export class SummaryPersonalizationEngine {
       id: sectionType,
       name: this.getSectionName(sectionType),
       content: await this.generateSectionContent(sectionType, summaryData, userProfile),
-      personalizedInsights: await this.generateSectionInsights(sectionType, summaryData, userProfile),
+      personalizedInsights: await this.generateSectionInsights(
+        sectionType,
+        summaryData,
+        userProfile
+      ),
       relevanceScore: this.calculateSectionRelevance(sectionType, userProfile),
-      adaptiveElements: {}
+      adaptiveElements: {},
     };
   }
 
@@ -775,12 +800,16 @@ export class SummaryPersonalizationEngine {
       goals: 'Goals & Achievements',
       achievements: 'Milestones Unlocked',
       challenges: 'Growth Opportunities',
-      growth: 'Progress Insights'
+      growth: 'Progress Insights',
     };
     return names[sectionType] || sectionType;
   }
 
-  private async generateSectionContent(sectionType: string, summaryData: any, userProfile: PersonalizationProfile): Promise<string> {
+  private async generateSectionContent(
+    sectionType: string,
+    summaryData: any,
+    userProfile: PersonalizationProfile
+  ): Promise<string> {
     // Generate content specific to section type
     switch (sectionType) {
       case 'goals':
@@ -792,12 +821,19 @@ export class SummaryPersonalizationEngine {
     }
   }
 
-  private async generateSectionInsights(sectionType: string, summaryData: any, userProfile: PersonalizationProfile): Promise<string[]> {
+  private async generateSectionInsights(
+    sectionType: string,
+    summaryData: any,
+    userProfile: PersonalizationProfile
+  ): Promise<string[]> {
     // Generate insights specific to section
     return [`Insight for ${sectionType} section`];
   }
 
-  private calculateSectionRelevance(sectionType: string, userProfile: PersonalizationProfile): number {
+  private calculateSectionRelevance(
+    sectionType: string,
+    userProfile: PersonalizationProfile
+  ): number {
     return userProfile.contentPreferences.focusAreas.includes(sectionType) ? 0.9 : 0.5;
   }
 
@@ -812,17 +848,21 @@ export class SummaryPersonalizationEngine {
       priority: 'medium',
       category: area,
       estimatedTime: '15-30 minutes daily',
-      personalizedReason: `Based on your recent patterns, this area shows the most potential for growth`
+      personalizedReason:
+        'Based on your recent patterns, this area shows the most potential for growth',
     };
   }
 
-  private async createStrengthBasedActionItem(strength: string, userProfile: PersonalizationProfile): Promise<any> {
+  private async createStrengthBasedActionItem(
+    strength: string,
+    userProfile: PersonalizationProfile
+  ): Promise<any> {
     return {
       text: `Leverage your strength in ${strength}`,
       priority: 'high',
       category: 'strengths',
       estimatedTime: '10-15 minutes',
-      personalizedReason: `Building on your existing strengths will accelerate your progress`
+      personalizedReason: 'Building on your existing strengths will accelerate your progress',
     };
   }
 
@@ -836,21 +876,25 @@ export class SummaryPersonalizationEngine {
       achievement: 'What achievement from this period are you most proud of, and why?',
       challenge: 'What challenge taught you the most about yourself?',
       learning: 'What new insight about yourself did you discover?',
-      future: 'What are you most excited to work on next?'
+      future: 'What are you most excited to work on next?',
     };
 
     return {
       question: prompts[category] || 'What stands out most from this period?',
       category,
       depth: 'moderate',
-      personalizedContext: `Based on your ${summaryData.period.description} journey`
+      personalizedContext: `Based on your ${summaryData.period.description} journey`,
     };
   }
 
-  private generateTemplateGreeting(summaryData: any, userProfile: PersonalizationProfile, contextAnalysis: any): string {
+  private generateTemplateGreeting(
+    summaryData: any,
+    userProfile: PersonalizationProfile,
+    contextAnalysis: any
+  ): string {
     const tone = userProfile.communicationStyle.preferredTone;
     const achievements = summaryData.goals.completed.length;
-    
+
     if (tone === 'casual') {
       return `Hey! Ready to see how awesome your ${summaryData.period.description} was? 🌟`;
     } else if (tone === 'professional') {
@@ -865,7 +909,10 @@ export class SummaryPersonalizationEngine {
     return {};
   }
 
-  private async identifyCurrentFocus(summaryData: any, userProfile: PersonalizationProfile): Promise<string[]> {
+  private async identifyCurrentFocus(
+    summaryData: any,
+    userProfile: PersonalizationProfile
+  ): Promise<string[]> {
     // Identify what the user is currently focusing on
     return userProfile.contentPreferences.focusAreas;
   }
@@ -896,19 +943,22 @@ export class SummaryPersonalizationEngine {
   private async updatePersonalizationFromEngagement(analytics: SummaryAnalytics): Promise<void> {
     // Update personalization profile based on engagement data
     const profile = await this.getPersonalizationProfile(analytics.userId);
-    
+
     // Analyze engagement patterns and update preferences
     const updates: Partial<PersonalizationProfile> = {};
-    
+
     if (analytics.engagement.responded) {
       // User engaged - reinforce current settings
       updates.learningPatterns = {
         ...profile.learningPatterns,
-        responsePatterns: [...profile.learningPatterns.responsePatterns, {
-          timestamp: new Date(),
-          engaged: true,
-          contentType: analytics.contentAnalysis.mostEngagingContent
-        }]
+        responsePatterns: [
+          ...profile.learningPatterns.responsePatterns,
+          {
+            timestamp: new Date(),
+            engaged: true,
+            contentType: analytics.contentAnalysis.mostEngagingContent,
+          },
+        ],
       };
     }
 
@@ -924,18 +974,21 @@ export class SummaryPersonalizationEngine {
 
   private generateImprovementSuggestion(area: string, userProfile: PersonalizationProfile): string {
     const suggestions = {
-      'engagement': 'Try setting specific times for daily check-ins to build consistency',
-      'goal_completion': 'Break larger goals into smaller, manageable daily tasks',
-      'reflection': 'Spend 5 minutes each evening reflecting on the day\'s experiences'
+      engagement: 'Try setting specific times for daily check-ins to build consistency',
+      goal_completion: 'Break larger goals into smaller, manageable daily tasks',
+      reflection: "Spend 5 minutes each evening reflecting on the day's experiences",
     };
-    
+
     return suggestions[area] || `Focus on improving ${area} through consistent daily practice`;
   }
 
-  private async generatePersonalizedTitle(summaryData: any, userProfile: PersonalizationProfile): Promise<string> {
+  private async generatePersonalizedTitle(
+    summaryData: any,
+    userProfile: PersonalizationProfile
+  ): Promise<string> {
     const period = summaryData.period.description;
     const tone = userProfile.communicationStyle.preferredTone;
-    
+
     if (tone === 'casual') {
       return `Your Amazing ${period} Journey! 🚀`;
     } else if (tone === 'professional') {
@@ -945,4 +998,3 @@ export class SummaryPersonalizationEngine {
     }
   }
 }
-

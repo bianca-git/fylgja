@@ -3,14 +3,14 @@
  * Provides seamless coordination between all system components
  */
 
-import { CoreProcessor } from '../core/core-processor';
-import { InteractionWorkflowEngine } from '../workflows/interaction-workflows';
-import { GoogleAIService } from '../services/google-ai-service';
-import { DatabaseService } from '../services/database-service';
-import { PromptEngine } from '../core/prompt-engine';
 import { AdaptiveLearningEngine } from '../core/adaptive-learning';
-import { performanceMonitor } from '../utils/monitoring';
+import { CoreProcessor } from '../core/core-processor';
+import { PromptEngine } from '../core/prompt-engine';
+import { DatabaseService } from '../services/database-service';
+import { GoogleAIService } from '../services/google-ai-service';
 import { FylgjaError, createSystemError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
+import { InteractionWorkflowEngine } from '../workflows/interaction-workflows';
 
 export interface IntegrationConfig {
   enableAdaptiveLearning: boolean;
@@ -60,12 +60,12 @@ export class ComponentIntegrator {
   private database: DatabaseService;
   private promptEngine: PromptEngine;
   private adaptiveLearning: AdaptiveLearningEngine;
-  
+
   private config: IntegrationConfig;
   private metrics: IntegrationMetrics;
   private circuitBreakers: Map<string, CircuitBreaker> = new Map();
   private healthCache: Map<string, ComponentHealth> = new Map();
-  
+
   private readonly HEALTH_CACHE_TTL = 30000; // 30 seconds
   private readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
 
@@ -110,15 +110,24 @@ export class ComponentIntegrator {
    * Initialize circuit breakers for each component
    */
   private initializeCircuitBreakers(): void {
-    const components = ['coreProcessor', 'googleAI', 'database', 'promptEngine', 'adaptiveLearning'];
-    
+    const components = [
+      'coreProcessor',
+      'googleAI',
+      'database',
+      'promptEngine',
+      'adaptiveLearning',
+    ];
+
     components.forEach(component => {
-      this.circuitBreakers.set(component, new CircuitBreaker({
-        threshold: this.config.circuitBreakerThreshold,
-        timeout: this.CIRCUIT_BREAKER_TIMEOUT,
-        onOpen: () => console.warn(`Circuit breaker opened for ${component}`),
-        onClose: () => console.info(`Circuit breaker closed for ${component}`),
-      }));
+      this.circuitBreakers.set(
+        component,
+        new CircuitBreaker({
+          threshold: this.config.circuitBreakerThreshold,
+          timeout: this.CIRCUIT_BREAKER_TIMEOUT,
+          onOpen: () => console.warn(`Circuit breaker opened for ${component}`),
+          onClose: () => console.info(`Circuit breaker closed for ${component}`),
+        })
+      );
     });
   }
 
@@ -148,10 +157,10 @@ export class ComponentIntegrator {
   }> {
     const startTime = Date.now();
     const timerId = performanceMonitor.startTimer('integrated_request');
-    
+
     try {
       this.metrics.requestCount++;
-      
+
       // Check system health before processing
       if (this.config.enablePerformanceMonitoring) {
         const health = await this.getSystemHealth();
@@ -200,7 +209,6 @@ export class ComponentIntegrator {
           confidence: result.confidence || 0.8,
         },
       };
-
     } catch (error) {
       this.metrics.errorCount++;
       performanceMonitor.endTimer(timerId);
@@ -234,7 +242,7 @@ export class ComponentIntegrator {
    */
   private async processWithWorkflow(request: any): Promise<any> {
     const circuitBreaker = this.circuitBreakers.get('workflowEngine')!;
-    
+
     return await circuitBreaker.execute(async () => {
       if (request.workflowId && request.input) {
         // Continue existing workflow
@@ -262,7 +270,7 @@ export class ComponentIntegrator {
    */
   private async processWithCore(request: any): Promise<any> {
     const circuitBreaker = this.circuitBreakers.get('coreProcessor')!;
-    
+
     return await circuitBreaker.execute(async () => {
       return await this.coreProcessor.processRequest({
         userId: request.userId,
@@ -282,7 +290,7 @@ export class ComponentIntegrator {
    */
   private async applyAdaptiveLearning(userId: string, input: string, result: any): Promise<void> {
     const circuitBreaker = this.circuitBreakers.get('adaptiveLearning')!;
-    
+
     try {
       await circuitBreaker.execute(async () => {
         await this.adaptiveLearning.analyzeUserResponse(
@@ -305,28 +313,30 @@ export class ComponentIntegrator {
   private async attemptErrorRecovery(request: any, error: any): Promise<any | null> {
     for (let attempt = 1; attempt <= this.config.maxRetryAttempts; attempt++) {
       try {
-        console.info(`Attempting error recovery, attempt ${attempt}/${this.config.maxRetryAttempts}`);
-        
+        console.info(
+          `Attempting error recovery, attempt ${attempt}/${this.config.maxRetryAttempts}`
+        );
+
         // Wait before retry (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-        
+
         // Retry with simplified request
         const simplifiedRequest = {
           ...request,
           useWorkflow: false, // Disable workflows on retry
           requestType: 'generate_question', // Fallback to simple question generation
         };
-        
+
         return await this.processWithCore(simplifiedRequest);
-        
       } catch (retryError) {
         console.warn(`Recovery attempt ${attempt} failed:`, retryError);
-        
+
         if (attempt === this.config.maxRetryAttempts) {
           // Final fallback - return a generic response
           return {
             success: true,
-            response: "I'm experiencing some technical difficulties right now. Let's try again in a moment. How are you doing today?",
+            response:
+              "I'm experiencing some technical difficulties right now. Let's try again in a moment. How are you doing today?",
             metrics: {
               processingTime: 0,
               componentsUsed: ['fallback'],
@@ -336,7 +346,7 @@ export class ComponentIntegrator {
         }
       }
     }
-    
+
     return null;
   }
 
@@ -345,7 +355,7 @@ export class ComponentIntegrator {
    */
   async getSystemHealth(): Promise<SystemHealth> {
     const components: ComponentHealth[] = [];
-    
+
     // Check each component
     const componentChecks = [
       { name: 'coreProcessor', check: () => this.coreProcessor.healthCheck() },
@@ -358,8 +368,8 @@ export class ComponentIntegrator {
     for (const { name, check } of componentChecks) {
       const cached = this.healthCache.get(name);
       const now = Date.now();
-      
-      if (cached && (now - new Date(cached.lastCheck).getTime()) < this.HEALTH_CACHE_TTL) {
+
+      if (cached && now - new Date(cached.lastCheck).getTime() < this.HEALTH_CACHE_TTL) {
         components.push(cached);
         continue;
       }
@@ -368,7 +378,7 @@ export class ComponentIntegrator {
         const startTime = Date.now();
         await check();
         const responseTime = Date.now() - startTime;
-        
+
         const health: ComponentHealth = {
           component: name,
           status: 'healthy',
@@ -376,10 +386,9 @@ export class ComponentIntegrator {
           responseTime,
           errorRate: this.calculateErrorRate(name),
         };
-        
+
         components.push(health);
         this.healthCache.set(name, health);
-        
       } catch (error) {
         const health: ComponentHealth = {
           component: name,
@@ -388,7 +397,7 @@ export class ComponentIntegrator {
           errorRate: this.calculateErrorRate(name),
           details: { error: error.message },
         };
-        
+
         components.push(health);
         this.healthCache.set(name, health);
       }
@@ -397,7 +406,7 @@ export class ComponentIntegrator {
     // Determine overall health
     const unhealthyCount = components.filter(c => c.status === 'unhealthy').length;
     const degradedCount = components.filter(c => c.status === 'degraded').length;
-    
+
     let overall: 'healthy' | 'degraded' | 'unhealthy';
     if (unhealthyCount > 1) {
       overall = 'unhealthy';
@@ -412,8 +421,10 @@ export class ComponentIntegrator {
       components,
       metrics: {
         totalRequests: this.metrics.requestCount,
-        successRate: this.metrics.requestCount > 0 ? 
-          (this.metrics.successCount / this.metrics.requestCount) * 100 : 100,
+        successRate:
+          this.metrics.requestCount > 0
+            ? (this.metrics.successCount / this.metrics.requestCount) * 100
+            : 100,
         averageResponseTime: this.metrics.averageResponseTime,
         activeUsers: 0, // Would be calculated from active sessions
         activeSessions: this.coreProcessor.getActiveSessionCount(),
@@ -467,8 +478,10 @@ export class ComponentIntegrator {
 
   private calculateErrorRate(component: string): number {
     const circuitBreaker = this.circuitBreakers.get(component);
-    if (!circuitBreaker) return 0;
-    
+    if (!circuitBreaker) {
+      return 0;
+    }
+
     return circuitBreaker.getErrorRate();
   }
 }
@@ -483,12 +496,14 @@ class CircuitBreaker {
   private successCount = 0;
   private totalRequests = 0;
 
-  constructor(private config: {
-    threshold: number;
-    timeout: number;
-    onOpen?: () => void;
-    onClose?: () => void;
-  }) {}
+  constructor(
+    private config: {
+      threshold: number;
+      timeout: number;
+      onOpen?: () => void;
+      onClose?: () => void;
+    }
+  ) {}
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     if (this.state === 'open') {
@@ -513,7 +528,7 @@ class CircuitBreaker {
 
   private onSuccess(): void {
     this.successCount++;
-    
+
     if (this.state === 'half-open') {
       this.state = 'closed';
       this.failureCount = 0;
@@ -532,7 +547,9 @@ class CircuitBreaker {
   }
 
   getErrorRate(): number {
-    if (this.totalRequests === 0) return 0;
+    if (this.totalRequests === 0) {
+      return 0;
+    }
     return (this.failureCount / this.totalRequests) * 100;
   }
 
@@ -543,4 +560,3 @@ class CircuitBreaker {
 
 // Global component integrator instance
 export const componentIntegrator = new ComponentIntegrator();
-

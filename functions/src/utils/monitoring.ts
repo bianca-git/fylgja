@@ -4,6 +4,7 @@
  */
 
 import { performance } from 'perf_hooks';
+
 import { DatabaseService } from '../services/database-service';
 
 export interface PerformanceMetric {
@@ -87,7 +88,7 @@ export class PerformanceMonitor {
 
   constructor() {
     this.dbService = new DatabaseService();
-    
+
     // Flush metrics buffer every 30 seconds
     this.bufferFlushInterval = setInterval(() => {
       this.flushMetricsBuffer();
@@ -118,7 +119,7 @@ export class PerformanceMonitor {
 
     // Extract name from timer ID
     const name = timerId.split('_')[0];
-    
+
     this.recordMetric({
       name: `${name}_duration`,
       value: duration,
@@ -137,12 +138,12 @@ export class PerformanceMonitor {
     // Add to in-memory storage
     const metricHistory = this.metrics.get(metric.name) || [];
     metricHistory.push(metric);
-    
+
     // Keep only last 1000 metrics per type
     if (metricHistory.length > 1000) {
       metricHistory.shift();
     }
-    
+
     this.metrics.set(metric.name, metricHistory);
 
     // Add to buffer for database storage
@@ -157,7 +158,7 @@ export class PerformanceMonitor {
   /**
    * Record counter metric
    */
-  public incrementCounter(name: string, value: number = 1, tags: Record<string, string> = {}): void {
+  public incrementCounter(name: string, value = 1, tags: Record<string, string> = {}): void {
     this.recordMetric({
       name,
       value,
@@ -170,7 +171,12 @@ export class PerformanceMonitor {
   /**
    * Record gauge metric
    */
-  public recordGauge(name: string, value: number, unit: 'ms' | 'bytes' | 'count' | 'percentage', tags: Record<string, string> = {}): void {
+  public recordGauge(
+    name: string,
+    value: number,
+    unit: 'ms' | 'bytes' | 'count' | 'percentage',
+    tags: Record<string, string> = {}
+  ): void {
     this.recordMetric({
       name,
       value,
@@ -183,7 +189,7 @@ export class PerformanceMonitor {
   /**
    * Get metrics for a specific name
    */
-  public getMetrics(name: string, limit: number = 100): PerformanceMetric[] {
+  public getMetrics(name: string, limit = 100): PerformanceMetric[] {
     const metrics = this.metrics.get(name) || [];
     return metrics.slice(-limit);
   }
@@ -191,7 +197,10 @@ export class PerformanceMonitor {
   /**
    * Get aggregated metrics
    */
-  public getAggregatedMetrics(name: string, timeWindow: number = 3600): {
+  public getAggregatedMetrics(
+    name: string,
+    timeWindow = 3600
+  ): {
     count: number;
     average: number;
     min: number;
@@ -200,7 +209,7 @@ export class PerformanceMonitor {
     p95: number;
     p99: number;
   } {
-    const cutoff = Date.now() - (timeWindow * 1000);
+    const cutoff = Date.now() - timeWindow * 1000;
     const metrics = this.getMetrics(name)
       .filter(m => new Date(m.timestamp).getTime() > cutoff)
       .map(m => m.value)
@@ -219,7 +228,7 @@ export class PerformanceMonitor {
     }
 
     const sum = metrics.reduce((a, b) => a + b, 0);
-    
+
     return {
       count: metrics.length,
       average: sum / metrics.length,
@@ -238,11 +247,11 @@ export class PerformanceMonitor {
     const index = (percentile / 100) * (sortedArray.length - 1);
     const lower = Math.floor(index);
     const upper = Math.ceil(index);
-    
+
     if (lower === upper) {
       return sortedArray[lower];
     }
-    
+
     const weight = index - lower;
     return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
   }
@@ -251,7 +260,9 @@ export class PerformanceMonitor {
    * Flush metrics buffer to database
    */
   private async flushMetricsBuffer(): Promise<void> {
-    if (this.metricsBuffer.length === 0) return;
+    if (this.metricsBuffer.length === 0) {
+      return;
+    }
 
     const metricsToFlush = [...this.metricsBuffer];
     this.metricsBuffer = [];
@@ -260,7 +271,7 @@ export class PerformanceMonitor {
       // In a real implementation, you'd batch insert these to the database
       // For now, we'll just log them
       console.log(`Flushing ${metricsToFlush.length} metrics to database`);
-      
+
       // You could implement database storage here
       // await this.dbService.saveMetrics(metricsToFlush);
     } catch (error) {
@@ -309,7 +320,7 @@ export class SystemMonitor {
   constructor() {
     this.performanceMonitor = new PerformanceMonitor();
     this.dbService = new DatabaseService();
-    
+
     // Monitor system metrics every minute
     this.monitoringInterval = setInterval(() => {
       this.collectSystemMetrics();
@@ -325,14 +336,22 @@ export class SystemMonitor {
   private async collectSystemMetrics(): Promise<void> {
     try {
       const metrics = await this.getSystemMetrics();
-      
+
       // Record individual metrics
-      this.performanceMonitor.recordGauge('memory_usage_percentage', metrics.memory.percentage, 'percentage');
+      this.performanceMonitor.recordGauge(
+        'memory_usage_percentage',
+        metrics.memory.percentage,
+        'percentage'
+      );
       this.performanceMonitor.recordGauge('cpu_usage', metrics.cpu.usage, 'percentage');
       this.performanceMonitor.recordGauge('request_count', metrics.requests.total, 'count');
       this.performanceMonitor.recordGauge('error_rate', metrics.errors.errorRate, 'percentage');
       this.performanceMonitor.recordGauge('ai_response_time', metrics.ai.averageResponseTime, 'ms');
-      this.performanceMonitor.recordGauge('database_query_time', metrics.database.averageQueryTime, 'ms');
+      this.performanceMonitor.recordGauge(
+        'database_query_time',
+        metrics.database.averageQueryTime,
+        'ms'
+      );
 
       // Check alert rules
       await this.checkAlertRules(metrics);
@@ -350,7 +369,7 @@ export class SystemMonitor {
   public async getSystemMetrics(): Promise<SystemMetrics> {
     const memoryUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
-    
+
     // Get performance metrics
     const requestMetrics = this.performanceMonitor.getAggregatedMetrics('request_duration');
     const errorMetrics = this.performanceMonitor.getAggregatedMetrics('error_count');
@@ -452,7 +471,9 @@ export class SystemMonitor {
    */
   private async checkAlertRules(metrics: SystemMetrics): Promise<void> {
     for (const rule of this.alertRules.values()) {
-      if (!rule.enabled) continue;
+      if (!rule.enabled) {
+        continue;
+      }
 
       const metricValue = this.getMetricValue(metrics, rule.metric);
       const shouldTrigger = this.evaluateCondition(metricValue, rule.condition, rule.threshold);
@@ -508,7 +529,7 @@ export class SystemMonitor {
    */
   private async triggerAlert(rule: AlertRule, value: number): Promise<void> {
     const existingAlert = this.activeAlerts.get(rule.id);
-    
+
     if (existingAlert && !existingAlert.resolved) {
       // Alert already active
       return;
@@ -538,7 +559,9 @@ export class SystemMonitor {
     await this.logAlert(alert);
 
     // Send notification (in production, this would integrate with notification systems)
-    console.warn(`ALERT: ${alert.ruleName} - ${alert.metric} is ${alert.value} (threshold: ${alert.threshold})`);
+    console.warn(
+      `ALERT: ${alert.ruleName} - ${alert.metric} is ${alert.value} (threshold: ${alert.threshold})`
+    );
   }
 
   /**
@@ -546,11 +569,11 @@ export class SystemMonitor {
    */
   private async resolveAlert(ruleId: string): Promise<void> {
     const alert = this.activeAlerts.get(ruleId);
-    
+
     if (alert && !alert.resolved) {
       alert.resolved = true;
       alert.resolvedAt = new Date().toISOString();
-      
+
       await this.logAlert(alert);
       console.info(`RESOLVED: ${alert.ruleName} alert has been resolved`);
     }
@@ -655,7 +678,7 @@ export function monitor(metricName?: string) {
 
     descriptor.value = async function (...args: any[]) {
       const timerId = performanceMonitor.startTimer(name);
-      
+
       try {
         const result = await method.apply(this, args);
         performanceMonitor.endTimer(timerId, { status: 'success' });
@@ -670,4 +693,3 @@ export function monitor(metricName?: string) {
     return descriptor;
   };
 }
-

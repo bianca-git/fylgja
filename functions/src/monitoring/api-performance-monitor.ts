@@ -104,17 +104,17 @@ export class APIPerformanceMonitor {
     performanceThresholds: {
       responseTime: {
         warning: 2000, // 2 seconds
-        critical: 5000 // 5 seconds
+        critical: 5000, // 5 seconds
       },
       errorRate: {
         warning: 0.05, // 5%
-        critical: 0.10 // 10%
+        critical: 0.1, // 10%
       },
       memoryUsage: {
-        warning: 0.80, // 80%
-        critical: 0.90 // 90%
-      }
-    }
+        warning: 0.8, // 80%
+        critical: 0.9, // 90%
+      },
+    },
   };
 
   private constructor() {
@@ -136,7 +136,7 @@ export class APIPerformanceMonitor {
   public recordMetric(metric: Omit<PerformanceMetric, 'timestamp'>): void {
     const fullMetric: PerformanceMetric = {
       ...metric,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.metricsBuffer.push(fullMetric);
@@ -179,7 +179,7 @@ export class APIPerformanceMonitor {
       requestSize: options.requestSize || 0,
       responseSize: options.responseSize || 0,
       cacheHit: options.cacheHit || false,
-      errorType: options.errorType
+      errorType: options.errorType,
     });
   }
 
@@ -217,17 +217,15 @@ export class APIPerformanceMonitor {
           successRate: (metrics.length - errors.length) / metrics.length,
           cacheHitRate: cacheHits.length / metrics.length,
           throughput: metrics.length / ((endTime.getTime() - startTime.getTime()) / 1000),
-          timestamp: new Date()
+          timestamp: new Date(),
         });
       }
 
       return aggregated;
     } catch (error) {
-      throw new FylgjaError(
-        'MONITORING_ERROR',
-        'Failed to get aggregated metrics',
-        { error: error.message }
-      );
+      throw new FylgjaError('MONITORING_ERROR', 'Failed to get aggregated metrics', {
+        error: error.message,
+      });
     }
   }
 
@@ -243,9 +241,10 @@ export class APIPerformanceMonitor {
 
       const errors = recentMetrics.filter(m => m.statusCode >= 400);
       const responseTimes = recentMetrics.map(m => m.responseTime);
-      const avgResponseTime = responseTimes.length > 0 
-        ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length 
-        : 0;
+      const avgResponseTime =
+        responseTimes.length > 0
+          ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
+          : 0;
 
       const errorRate = recentMetrics.length > 0 ? errors.length / recentMetrics.length : 0;
 
@@ -253,7 +252,7 @@ export class APIPerformanceMonitor {
       const memoryUsage = {
         used: Math.floor(Math.random() * 8000000000), // 8GB max
         total: 8000000000,
-        percentage: Math.random() * 0.8 // 0-80%
+        percentage: Math.random() * 0.8, // 0-80%
       };
 
       const health: SystemHealth = {
@@ -265,16 +264,14 @@ export class APIPerformanceMonitor {
         queueDepth: Math.floor(Math.random() * 100),
         errorRate,
         responseTime: avgResponseTime,
-        timestamp: now
+        timestamp: now,
       };
 
       return health;
     } catch (error) {
-      throw new FylgjaError(
-        'MONITORING_ERROR',
-        'Failed to get system health',
-        { error: error.message }
-      );
+      throw new FylgjaError('MONITORING_ERROR', 'Failed to get system health', {
+        error: error.message,
+      });
     }
   }
 
@@ -284,7 +281,7 @@ export class APIPerformanceMonitor {
   public createAlertRule(rule: Omit<AlertRule, 'id'>): string {
     const id = `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const fullRule: AlertRule = { ...rule, id };
-    
+
     this.alertRules.set(id, fullRule);
     return id;
   }
@@ -325,7 +322,7 @@ export class APIPerformanceMonitor {
     const periodMs = {
       hour: 60 * 60 * 1000,
       day: 24 * 60 * 60 * 1000,
-      week: 7 * 24 * 60 * 60 * 1000
+      week: 7 * 24 * 60 * 60 * 1000,
     }[period];
 
     const startTime = new Date(now.getTime() - periodMs);
@@ -333,20 +330,25 @@ export class APIPerformanceMonitor {
 
     return metrics.map(m => ({
       timestamp: m.timestamp,
-      value: metric === 'responseTime' ? m.averageResponseTime :
-             metric === 'errorRate' ? m.errorRate :
-             m.throughput
+      value:
+        metric === 'responseTime'
+          ? m.averageResponseTime
+          : metric === 'errorRate'
+            ? m.errorRate
+            : m.throughput,
     }));
   }
 
   /**
    * Get top slow endpoints
    */
-  public async getSlowEndpoints(limit: number = 10): Promise<{
-    endpoint: string;
-    averageResponseTime: number;
-    requestCount: number;
-  }[]> {
+  public async getSlowEndpoints(limit = 10): Promise<
+    {
+      endpoint: string;
+      averageResponseTime: number;
+      requestCount: number;
+    }[]
+  > {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const metrics = await this.getAggregatedMetrics(oneHourAgo, now, 'endpoint');
@@ -357,7 +359,7 @@ export class APIPerformanceMonitor {
       .map(m => ({
         endpoint: m.endpoint,
         averageResponseTime: m.averageResponseTime,
-        requestCount: m.totalRequests
+        requestCount: m.totalRequests,
       }));
   }
 
@@ -372,10 +374,8 @@ export class APIPerformanceMonitor {
   }> {
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
-    const errorMetrics = this.metrics.filter(
-      m => m.timestamp >= oneDayAgo && m.statusCode >= 400
-    );
+
+    const errorMetrics = this.metrics.filter(m => m.timestamp >= oneDayAgo && m.statusCode >= 400);
 
     const errorsByType: Record<string, number> = {};
     const errorsByEndpoint: Record<string, number> = {};
@@ -397,7 +397,7 @@ export class APIPerformanceMonitor {
       );
       errorTrend.push({
         timestamp: hourStart,
-        count: hourErrors.length
+        count: hourErrors.length,
       });
     }
 
@@ -405,7 +405,7 @@ export class APIPerformanceMonitor {
       totalErrors: errorMetrics.length,
       errorsByType,
       errorsByEndpoint,
-      errorTrend
+      errorTrend,
     };
   }
 
@@ -422,9 +422,7 @@ export class APIPerformanceMonitor {
       severity: 'medium',
       enabled: true,
       cooldownPeriod: this.config.alertCooldownMinutes,
-      actions: [
-        { type: 'log', target: 'console', parameters: {} }
-      ]
+      actions: [{ type: 'log', target: 'console', parameters: {} }],
     });
 
     // High error rate alert
@@ -435,9 +433,7 @@ export class APIPerformanceMonitor {
       severity: 'high',
       enabled: true,
       cooldownPeriod: this.config.alertCooldownMinutes,
-      actions: [
-        { type: 'log', target: 'console', parameters: {} }
-      ]
+      actions: [{ type: 'log', target: 'console', parameters: {} }],
     });
 
     // High memory usage alert
@@ -448,9 +444,7 @@ export class APIPerformanceMonitor {
       severity: 'medium',
       enabled: true,
       cooldownPeriod: this.config.alertCooldownMinutes,
-      actions: [
-        { type: 'log', target: 'console', parameters: {} }
-      ]
+      actions: [{ type: 'log', target: 'console', parameters: {} }],
     });
   }
 
@@ -467,25 +461,31 @@ export class APIPerformanceMonitor {
   }
 
   private flushMetricsBuffer(): void {
-    if (this.metricsBuffer.length === 0) return;
+    if (this.metricsBuffer.length === 0) {
+      return;
+    }
 
     // Move buffer to main metrics array
     this.metrics.push(...this.metricsBuffer);
     this.metricsBuffer = [];
 
     // Clean up old metrics
-    const cutoffTime = new Date(Date.now() - this.config.metricsRetentionDays * 24 * 60 * 60 * 1000);
+    const cutoffTime = new Date(
+      Date.now() - this.config.metricsRetentionDays * 24 * 60 * 60 * 1000
+    );
     this.metrics = this.metrics.filter(m => m.timestamp > cutoffTime);
   }
 
   private async performHealthCheck(): Promise<void> {
     try {
       const health = await this.getSystemHealth();
-      
+
       // Check alert conditions
       for (const rule of this.alertRules.values()) {
-        if (!rule.enabled) continue;
-        
+        if (!rule.enabled) {
+          continue;
+        }
+
         const shouldTrigger = this.evaluateAlertCondition(rule, health);
         if (shouldTrigger) {
           this.triggerAlert(rule, health);
@@ -503,7 +503,7 @@ export class APIPerformanceMonitor {
         ruleId: 'realtime_response_time',
         severity: 'critical',
         message: `Critical response time: ${metric.responseTime}ms on ${metric.endpoint}`,
-        metadata: { metric }
+        metadata: { metric },
       });
     }
 
@@ -512,7 +512,7 @@ export class APIPerformanceMonitor {
         ruleId: 'realtime_server_error',
         severity: 'high',
         message: `Server error ${metric.statusCode} on ${metric.endpoint}`,
-        metadata: { metric }
+        metadata: { metric },
       });
     }
   }
@@ -544,7 +544,7 @@ export class APIPerformanceMonitor {
       ruleId: rule.id,
       severity: rule.severity,
       message: `Alert: ${rule.name} - ${rule.condition} (threshold: ${rule.threshold})`,
-      metadata: { context, rule }
+      metadata: { context, rule },
     });
 
     rule.lastTriggered = new Date();
@@ -560,7 +560,7 @@ export class APIPerformanceMonitor {
       ...alertData,
       id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date(),
-      resolved: false
+      resolved: false,
     };
 
     this.activeAlerts.set(alert.id, alert);
@@ -587,7 +587,7 @@ export class APIPerformanceMonitor {
 
     metrics.forEach(metric => {
       let key: string;
-      
+
       switch (groupBy) {
         case 'endpoint':
           key = metric.endpoint;
@@ -615,8 +615,10 @@ export class APIPerformanceMonitor {
   }
 
   private getPercentile(sortedArray: number[], percentile: number): number {
-    if (sortedArray.length === 0) return 0;
-    
+    if (sortedArray.length === 0) {
+      return 0;
+    }
+
     const index = Math.ceil(sortedArray.length * percentile) - 1;
     return sortedArray[Math.max(0, Math.min(index, sortedArray.length - 1))];
   }
@@ -661,4 +663,3 @@ export class APIPerformanceMonitor {
 
 // Export singleton instance
 export const apiPerformanceMonitor = APIPerformanceMonitor.getInstance();
-

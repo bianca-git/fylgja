@@ -18,8 +18,7 @@
     "declaration": true,
     "declarationMap": true,
     "types": [
-      "node",
-      "jest"
+      "node"
     ],
     "lib": [
       "es2017",

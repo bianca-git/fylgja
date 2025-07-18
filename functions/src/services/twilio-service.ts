@@ -3,10 +3,12 @@
  * Handles Twilio API interactions for WhatsApp messaging
  */
 
-import { Twilio } from 'twilio';
 import * as crypto from 'crypto';
-import { FylgjaError, ErrorType } from '../utils/error-handler';
+
+import { Twilio } from 'twilio';
+
 import { RedisCacheService } from '../cache/redis-cache-service';
+import { FylgjaError, ErrorType } from '../utils/error-handler';
 
 export interface WhatsAppMessageRequest {
   to: string;
@@ -67,8 +69,8 @@ export class TwilioService {
         context: {
           hasAccountSid: !!accountSid,
           hasAuthToken: !!authToken,
-          hasWhatsappNumber: !!whatsappNumber
-        }
+          hasWhatsappNumber: !!whatsappNumber,
+        },
       });
     }
 
@@ -77,27 +79,29 @@ export class TwilioService {
       authToken,
       whatsappNumber,
       webhookUrl: webhookUrl || '',
-      statusWebhookUrl: statusWebhookUrl || ''
+      statusWebhookUrl: statusWebhookUrl || '',
     };
   }
 
   /**
    * Send WhatsApp message via Twilio
    */
-  public async sendWhatsAppMessage(request: WhatsAppMessageRequest): Promise<WhatsAppMessageResponse> {
+  public async sendWhatsAppMessage(
+    request: WhatsAppMessageRequest
+  ): Promise<WhatsAppMessageResponse> {
     try {
       console.log('Sending WhatsApp message via Twilio', {
         to: request.to,
         bodyLength: request.body.length,
         hasMedia: !!request.mediaUrl,
-        requestId: request.requestId
+        requestId: request.requestId,
       });
 
       // Prepare message options
       const messageOptions: any = {
         from: `whatsapp:${this.config.whatsappNumber}`,
         to: request.to,
-        body: request.body
+        body: request.body,
       };
 
       // Add media URL if provided
@@ -118,26 +122,25 @@ export class TwilioService {
         status: message.status,
         to: message.to,
         from: message.from,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       console.log('WhatsApp message sent successfully', {
         messageId: response.messageId,
         status: response.status,
         to: response.to,
-        requestId: request.requestId
+        requestId: request.requestId,
       });
 
       // Cache message for tracking
       await this.cacheMessage(response, request.requestId);
 
       return response;
-
     } catch (error) {
       console.error('Failed to send WhatsApp message', {
         to: request.to,
         error: error.message,
-        requestId: request.requestId
+        requestId: request.requestId,
       });
 
       throw new FylgjaError({
@@ -146,8 +149,8 @@ export class TwilioService {
         context: {
           to: request.to,
           error: error.message,
-          requestId: request.requestId
-        }
+          requestId: request.requestId,
+        },
       });
     }
   }
@@ -164,7 +167,7 @@ export class TwilioService {
 
       // Create validation string from URL and parameters
       let validationString = url;
-      
+
       // Sort parameters and append to validation string
       const sortedParams = Object.keys(params).sort();
       for (const key of sortedParams) {
@@ -185,17 +188,16 @@ export class TwilioService {
           provided: signature,
           expected: expectedSignature,
           url,
-          validationString: validationString.substring(0, 100) + '...'
+          validationString: validationString.substring(0, 100) + '...',
         });
       }
 
       return isValid;
-
     } catch (error) {
       console.error('Error validating Twilio webhook signature', {
         error: error.message,
         signature,
-        url
+        url,
       });
       return false;
     }
@@ -211,7 +213,7 @@ export class TwilioService {
       // Check cache first
       const cacheKey = `media:${crypto.createHash('md5').update(mediaUrl).digest('hex')}`;
       const cachedMedia = await this.cacheService.get(cacheKey);
-      
+
       if (cachedMedia) {
         console.log('Media found in cache', { mediaUrl });
         return Buffer.from(cachedMedia, 'base64');
@@ -220,8 +222,8 @@ export class TwilioService {
       // Download media using Twilio client
       const response = await fetch(mediaUrl, {
         headers: {
-          'Authorization': `Basic ${Buffer.from(`${this.config.accountSid}:${this.config.authToken}`).toString('base64')}`
-        }
+          Authorization: `Basic ${Buffer.from(`${this.config.accountSid}:${this.config.authToken}`).toString('base64')}`,
+        },
       });
 
       if (!response.ok) {
@@ -235,15 +237,14 @@ export class TwilioService {
 
       console.log('Media downloaded successfully', {
         mediaUrl,
-        size: mediaBuffer.length
+        size: mediaBuffer.length,
       });
 
       return mediaBuffer;
-
     } catch (error) {
       console.error('Failed to download media from Twilio', {
         mediaUrl,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
@@ -251,8 +252,8 @@ export class TwilioService {
         message: 'Failed to download media from Twilio',
         context: {
           mediaUrl,
-          error: error.message
-        }
+          error: error.message,
+        },
       });
     }
   }
@@ -277,20 +278,19 @@ export class TwilioService {
         errorCode: message.errorCode,
         errorMessage: message.errorMessage,
         price: message.price,
-        priceUnit: message.priceUnit
+        priceUnit: message.priceUnit,
       };
 
       console.log('Message status retrieved successfully', {
         messageId,
-        status: status.status
+        status: status.status,
       });
 
       return status;
-
     } catch (error) {
       console.error('Failed to get message status from Twilio', {
         messageId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
@@ -298,8 +298,8 @@ export class TwilioService {
         message: 'Failed to get message status from Twilio',
         context: {
           messageId,
-          error: error.message
-        }
+          error: error.message,
+        },
       });
     }
   }
@@ -307,13 +307,13 @@ export class TwilioService {
   /**
    * List recent messages from Twilio
    */
-  public async listRecentMessages(limit: number = 20): Promise<any[]> {
+  public async listRecentMessages(limit = 20): Promise<any[]> {
     try {
       console.log('Listing recent messages from Twilio', { limit });
 
       const messages = await this.twilioClient.messages.list({
         limit,
-        from: `whatsapp:${this.config.whatsappNumber}`
+        from: `whatsapp:${this.config.whatsappNumber}`,
       });
 
       const messageList = messages.map(message => ({
@@ -325,26 +325,25 @@ export class TwilioService {
         dateCreated: message.dateCreated,
         dateSent: message.dateSent,
         errorCode: message.errorCode,
-        errorMessage: message.errorMessage
+        errorMessage: message.errorMessage,
       }));
 
       console.log('Recent messages retrieved successfully', {
-        count: messageList.length
+        count: messageList.length,
       });
 
       return messageList;
-
     } catch (error) {
       console.error('Failed to list recent messages from Twilio', {
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.EXTERNAL_SERVICE_ERROR,
         message: 'Failed to list recent messages from Twilio',
         context: {
-          error: error.message
-        }
+          error: error.message,
+        },
       });
     }
   }
@@ -356,7 +355,7 @@ export class TwilioService {
     try {
       console.log('Configuring WhatsApp webhooks', {
         webhookUrl: this.config.webhookUrl,
-        statusWebhookUrl: this.config.statusWebhookUrl
+        statusWebhookUrl: this.config.statusWebhookUrl,
       });
 
       // Update webhook configuration for WhatsApp number
@@ -365,18 +364,17 @@ export class TwilioService {
         // This is a placeholder for programmatic webhook configuration
         console.log('Webhook configuration should be done through Twilio Console');
       }
-
     } catch (error) {
       console.error('Failed to configure webhooks', {
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.CONFIGURATION_ERROR,
         message: 'Failed to configure WhatsApp webhooks',
         context: {
-          error: error.message
-        }
+          error: error.message,
+        },
       });
     }
   }
@@ -390,16 +388,15 @@ export class TwilioService {
       const cacheData = {
         ...message,
         requestId,
-        cachedAt: new Date().toISOString()
+        cachedAt: new Date().toISOString(),
       };
 
       // Cache for 24 hours
       await this.cacheService.set(cacheKey, cacheData, 86400);
-
     } catch (error) {
       console.error('Failed to cache message', {
         messageId: message.messageId,
-        error: error.message
+        error: error.message,
       });
       // Don't throw error for caching failures
     }
@@ -418,20 +415,19 @@ export class TwilioService {
         status: account.status,
         type: account.type,
         dateCreated: account.dateCreated,
-        dateUpdated: account.dateUpdated
+        dateUpdated: account.dateUpdated,
       };
-
     } catch (error) {
       console.error('Failed to get account info from Twilio', {
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.EXTERNAL_SERVICE_ERROR,
         message: 'Failed to get account info from Twilio',
         context: {
-          error: error.message
-        }
+          error: error.message,
+        },
       });
     }
   }
@@ -453,17 +449,16 @@ export class TwilioService {
           accountStatus: account.status,
           accountSid: account.accountSid,
           timestamp: new Date().toISOString(),
-          whatsappNumber: this.config.whatsappNumber
-        }
+          whatsappNumber: this.config.whatsappNumber,
+        },
       };
-
     } catch (error) {
       return {
         healthy: false,
         details: {
           error: error.message,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       };
     }
   }
@@ -471,7 +466,9 @@ export class TwilioService {
   /**
    * Get usage statistics from Twilio
    */
-  public async getUsageStatistics(period: 'today' | 'yesterday' | 'last_week' | 'last_month' = 'today'): Promise<any> {
+  public async getUsageStatistics(
+    period: 'today' | 'yesterday' | 'last_week' | 'last_month' = 'today'
+  ): Promise<any> {
     try {
       console.log('Getting usage statistics from Twilio', { period });
 
@@ -499,7 +496,7 @@ export class TwilioService {
       const usage = await this.twilioClient.usage.records.list({
         startDate: startDate.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0],
-        category: 'messages'
+        category: 'messages',
       });
 
       const statistics = {
@@ -515,8 +512,8 @@ export class TwilioService {
           count: record.count,
           usage: record.usage,
           price: record.price,
-          priceUnit: record.priceUnit
-        }))
+          priceUnit: record.priceUnit,
+        })),
       };
 
       // Calculate totals
@@ -526,15 +523,14 @@ export class TwilioService {
       console.log('Usage statistics retrieved successfully', {
         period,
         totalMessages: statistics.totalMessages,
-        totalCost: statistics.totalCost
+        totalCost: statistics.totalCost,
       });
 
       return statistics;
-
     } catch (error) {
       console.error('Failed to get usage statistics from Twilio', {
         period,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
@@ -542,10 +538,9 @@ export class TwilioService {
         message: 'Failed to get usage statistics from Twilio',
         context: {
           period,
-          error: error.message
-        }
+          error: error.message,
+        },
       });
     }
   }
 }
-

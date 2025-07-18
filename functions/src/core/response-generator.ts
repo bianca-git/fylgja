@@ -3,13 +3,14 @@
  * Intelligent, contextual, and personalized response generation
  */
 
-import { GoogleAIService } from '../services/google-ai-service';
-import { PromptEngine } from './prompt-engine';
-import { AdaptiveLearningEngine } from './adaptive-learning';
-import { EnhancedDatabaseService } from '../services/enhanced-database-service';
-import { performanceMonitor } from '../utils/monitoring';
-import { FylgjaError, createSystemError } from '../utils/error-handler';
 import { cacheService } from '../cache/redis-cache-service';
+import { EnhancedDatabaseService } from '../services/enhanced-database-service';
+import { GoogleAIService } from '../services/google-ai-service';
+import { FylgjaError, createSystemError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
+
+import { AdaptiveLearningEngine } from './adaptive-learning';
+import { PromptEngine } from './prompt-engine';
 
 export interface ResponseContext {
   userId: string;
@@ -72,7 +73,13 @@ export interface UserProfile {
 }
 
 export interface ResponseOptions {
-  responseType: 'question' | 'acknowledgment' | 'suggestion' | 'reflection' | 'encouragement' | 'clarification';
+  responseType:
+    | 'question'
+    | 'acknowledgment'
+    | 'suggestion'
+    | 'reflection'
+    | 'encouragement'
+    | 'clarification';
   tone: 'supportive' | 'motivational' | 'reflective' | 'celebratory' | 'empathetic' | 'curious';
   includeFollowUp: boolean;
   includeActionItems: boolean;
@@ -138,10 +145,10 @@ export class ResponseGenerator {
   private promptEngine: PromptEngine;
   private adaptiveLearning: AdaptiveLearningEngine;
   private database: EnhancedDatabaseService;
-  
+
   private responseTemplates: Map<string, ResponseTemplate> = new Map();
   private conversationFlows: Map<string, ConversationFlow> = new Map();
-  
+
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_CONTEXT_MESSAGES = 10;
   private readonly PERSONALIZATION_THRESHOLD = 0.7;
@@ -151,7 +158,7 @@ export class ResponseGenerator {
     this.promptEngine = new PromptEngine();
     this.adaptiveLearning = new AdaptiveLearningEngine();
     this.database = new EnhancedDatabaseService();
-    
+
     this.initializeResponseTemplates();
   }
 
@@ -171,7 +178,7 @@ export class ResponseGenerator {
       // Check cache for similar responses
       const cacheKey = this.generateCacheKey(context, options);
       const cachedResponse = await cacheService.get(cacheKey);
-      
+
       if (cachedResponse && this.shouldUseCachedResponse(cachedResponse, context)) {
         performanceMonitor.endTimer(timerId);
         return this.adaptCachedResponse(cachedResponse, context);
@@ -179,7 +186,7 @@ export class ResponseGenerator {
 
       // Analyze conversation context
       const contextAnalysis = await this.analyzeConversationContext(context);
-      
+
       // Apply adaptive learning insights
       const learningInsights = await this.adaptiveLearning.analyzeUserBehavior(
         context.userId,
@@ -217,11 +224,7 @@ export class ResponseGenerator {
       );
 
       // Generate alternatives
-      const alternatives = await this.generateAlternatives(
-        enhancedResponse,
-        context,
-        options
-      );
+      const alternatives = await this.generateAlternatives(enhancedResponse, context, options);
 
       // Create final response object
       const finalResponse: GeneratedResponse = {
@@ -255,7 +258,6 @@ export class ResponseGenerator {
 
       performanceMonitor.endTimer(timerId);
       return finalResponse;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Response generation failed: ${error.message}`);
@@ -297,10 +299,9 @@ export class ResponseGenerator {
       });
 
       const followUps = this.parseFollowUpQuestions(aiResponse.content);
-      
+
       performanceMonitor.endTimer(timerId);
       return followUps;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Follow-up generation failed: ${error.message}`);
@@ -316,13 +317,13 @@ export class ResponseGenerator {
     stepId: string
   ): Promise<GeneratedResponse> {
     const flow = this.conversationFlows.get(flowId);
-    
+
     if (!flow) {
       throw createSystemError(`Conversation flow not found: ${flowId}`);
     }
 
     const currentStep = flow.steps.find(step => step.id === stepId);
-    
+
     if (!currentStep) {
       throw createSystemError(`Flow step not found: ${stepId}`);
     }
@@ -354,10 +355,7 @@ export class ResponseGenerator {
   /**
    * Analyze conversation sentiment and adjust response accordingly
    */
-  async analyzeSentimentAndAdjust(
-    context: ResponseContext,
-    baseResponse: string
-  ): Promise<string> {
+  async analyzeSentimentAndAdjust(context: ResponseContext, baseResponse: string): Promise<string> {
     const timerId = performanceMonitor.startTimer('sentiment_adjustment');
 
     try {
@@ -378,7 +376,6 @@ export class ResponseGenerator {
 
       performanceMonitor.endTimer(timerId);
       return baseResponse;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       console.warn('Sentiment adjustment failed, using base response:', error);
@@ -392,7 +389,7 @@ export class ResponseGenerator {
   async generatePersonalizedGreeting(context: ResponseContext): Promise<string> {
     const { timeOfDay, userProfile } = context;
     const name = userProfile.name;
-    
+
     const greetingTemplates = {
       morning: [
         `Good morning, ${name}! Ready to make today amazing?`,
@@ -441,7 +438,7 @@ export class ResponseGenerator {
     if (!context.userId) {
       throw createSystemError('User ID is required for response generation');
     }
-    
+
     if (!context.userProfile) {
       throw createSystemError('User profile is required for response generation');
     }
@@ -460,7 +457,7 @@ export class ResponseGenerator {
       context.platform,
       JSON.stringify(context.messageHistory.slice(-2).map(m => m.content)),
     ];
-    
+
     return `response_${keyComponents.join('_')}`;
   }
 
@@ -478,7 +475,10 @@ export class ResponseGenerator {
     return true;
   }
 
-  private adaptCachedResponse(cachedResponse: GeneratedResponse, context: ResponseContext): GeneratedResponse {
+  private adaptCachedResponse(
+    cachedResponse: GeneratedResponse,
+    context: ResponseContext
+  ): GeneratedResponse {
     // Adapt cached response to current context
     const adaptedContent = cachedResponse.content.replace(
       /\b(morning|afternoon|evening|night)\b/gi,
@@ -497,12 +497,12 @@ export class ResponseGenerator {
 
   private async analyzeConversationContext(context: ResponseContext): Promise<any> {
     const recentMessages = context.messageHistory.slice(-this.MAX_CONTEXT_MESSAGES);
-    
+
     // Analyze topics, sentiment, and patterns
     const topics = this.extractTopics(recentMessages);
     const sentiment = this.analyzeSentiment(recentMessages);
     const patterns = this.identifyPatterns(recentMessages);
-    
+
     return {
       topics,
       sentiment,
@@ -584,15 +584,17 @@ export class ResponseGenerator {
     }
 
     // Add follow-ups if requested
-    const followUps = options.includeFollowUp ? 
-      await this.generateContextualFollowUps(context, enhancedContent) : [];
+    const followUps = options.includeFollowUp
+      ? await this.generateContextualFollowUps(context, enhancedContent)
+      : [];
 
     // Extract action items if requested
-    const actionItems = options.includeActionItems ? 
-      this.extractActionItems(enhancedContent) : [];
+    const actionItems = options.includeActionItems ? this.extractActionItems(enhancedContent) : [];
 
     // Analyze response sentiment
-    const sentiment = await this.analyzeSentiment([{ content: enhancedContent } as ConversationMessage]);
+    const sentiment = await this.analyzeSentiment([
+      { content: enhancedContent } as ConversationMessage,
+    ]);
 
     return {
       content: enhancedContent,
@@ -601,7 +603,8 @@ export class ResponseGenerator {
       actionItems,
       topics: contextAnalysis.topics,
       sentiment,
-      reasoning: aiResponse.reasoning || 'Generated based on conversation context and user preferences',
+      reasoning:
+        aiResponse.reasoning || 'Generated based on conversation context and user preferences',
     };
   }
 
@@ -612,7 +615,7 @@ export class ResponseGenerator {
   ): Promise<string[]> {
     // Generate 2-3 alternative phrasings
     const alternativePrompt = `Rephrase this response in 2 different ways while maintaining the same meaning and tone: "${response.content}"`;
-    
+
     try {
       const aiResponse = await this.googleAI.generateResponse({
         prompt: alternativePrompt,
@@ -635,10 +638,18 @@ export class ResponseGenerator {
     let score = 0.5; // Base score
 
     // Increase score based on available user data
-    if (context.userProfile.preferences.personalityType) score += 0.1;
-    if (context.userProfile.goals.length > 0) score += 0.1;
-    if (context.userProfile.recentInteractions.length > 5) score += 0.1;
-    if (learningInsights.confidence > this.PERSONALIZATION_THRESHOLD) score += 0.2;
+    if (context.userProfile.preferences.personalityType) {
+      score += 0.1;
+    }
+    if (context.userProfile.goals.length > 0) {
+      score += 0.1;
+    }
+    if (context.userProfile.recentInteractions.length > 5) {
+      score += 0.1;
+    }
+    if (learningInsights.confidence > this.PERSONALIZATION_THRESHOLD) {
+      score += 0.2;
+    }
 
     return Math.min(score, 1.0);
   }
@@ -647,10 +658,22 @@ export class ResponseGenerator {
     let engagement = 0.5; // Base engagement
 
     // Factors that increase engagement
-    if (response.followUps.length > 0) engagement += 0.1;
-    if (response.actionItems.length > 0) engagement += 0.1;
-    if (response.content.includes(context.userProfile.name)) engagement += 0.1;
-    if (response.topics.some((topic: string) => context.userProfile.preferences.topics.includes(topic))) engagement += 0.2;
+    if (response.followUps.length > 0) {
+      engagement += 0.1;
+    }
+    if (response.actionItems.length > 0) {
+      engagement += 0.1;
+    }
+    if (response.content.includes(context.userProfile.name)) {
+      engagement += 0.1;
+    }
+    if (
+      response.topics.some((topic: string) =>
+        context.userProfile.preferences.topics.includes(topic)
+      )
+    ) {
+      engagement += 0.2;
+    }
 
     return Math.min(engagement, 1.0);
   }
@@ -674,15 +697,17 @@ export class ResponseGenerator {
   }
 
   private calculateMaxTokens(maxLength?: number): number {
-    if (!maxLength) return 500;
-    
+    if (!maxLength) {
+      return 500;
+    }
+
     // Rough estimation: 1 token ≈ 0.75 words
     return Math.floor(maxLength * 0.75);
   }
 
   private calculateTemperature(tone: string, userProfile: UserProfile): number {
     const baseTemperature = 0.7;
-    
+
     // Adjust based on tone
     const toneAdjustments: Record<string, number> = {
       supportive: 0.6,
@@ -726,7 +751,7 @@ export class ResponseGenerator {
     context: ResponseContext
   ): Promise<string> {
     const adjustmentPrompt = `Adjust the tone of this response to be more ${newTone} while keeping the same meaning: "${response}"`;
-    
+
     try {
       const aiResponse = await this.googleAI.generateResponse({
         prompt: adjustmentPrompt,
@@ -746,11 +771,19 @@ export class ResponseGenerator {
 
   private extractTopics(messages: ConversationMessage[]): string[] {
     // Simple topic extraction (in production, use more sophisticated NLP)
-    const commonTopics = ['work', 'health', 'relationships', 'goals', 'learning', 'creativity', 'productivity'];
+    const commonTopics = [
+      'work',
+      'health',
+      'relationships',
+      'goals',
+      'learning',
+      'creativity',
+      'productivity',
+    ];
     const extractedTopics: string[] = [];
 
     const allText = messages.map(m => m.content.toLowerCase()).join(' ');
-    
+
     commonTopics.forEach(topic => {
       if (allText.includes(topic)) {
         extractedTopics.push(topic);
@@ -787,20 +820,26 @@ export class ResponseGenerator {
 
     if (messages.length > 3) {
       const avgLength = messages.reduce((sum, m) => sum + m.content.length, 0) / messages.length;
-      
-      if (avgLength < 50) patterns.push('brief_responses');
-      if (avgLength > 200) patterns.push('detailed_responses');
+
+      if (avgLength < 50) {
+        patterns.push('brief_responses');
+      }
+      if (avgLength > 200) {
+        patterns.push('detailed_responses');
+      }
     }
 
     return patterns;
   }
 
   private calculateRelevanceScore(topics: string[], userProfile: UserProfile): number {
-    if (topics.length === 0) return 0.5;
+    if (topics.length === 0) {
+      return 0.5;
+    }
 
     const userTopics = userProfile.preferences.topics;
     const relevantTopics = topics.filter(topic => userTopics.includes(topic));
-    
+
     return relevantTopics.length / topics.length;
   }
 
@@ -814,13 +853,14 @@ export class ResponseGenerator {
 
     // Add context-specific instructions
     if (contextAnalysis.sentiment < -0.3) {
-      enhancedPrompt += '\n\nNote: The user seems to be feeling down. Be extra empathetic and supportive.';
+      enhancedPrompt +=
+        '\n\nNote: The user seems to be feeling down. Be extra empathetic and supportive.';
     }
 
     if (context.timeOfDay === 'morning') {
-      enhancedPrompt += '\n\nNote: It\'s morning, so focus on energy and planning for the day.';
+      enhancedPrompt += "\n\nNote: It's morning, so focus on energy and planning for the day.";
     } else if (context.timeOfDay === 'evening') {
-      enhancedPrompt += '\n\nNote: It\'s evening, so focus on reflection and winding down.';
+      enhancedPrompt += "\n\nNote: It's evening, so focus on reflection and winding down.";
     }
 
     if (options.responseType === 'encouragement') {
@@ -839,14 +879,14 @@ export class ResponseGenerator {
     if (learningInsights.patterns.includes('prefers_brief_responses')) {
       // Shorten the response
       const shortenPrompt = `Make this response more concise while keeping the key message: "${content}"`;
-      
+
       try {
         const aiResponse = await this.googleAI.generateResponse({
           prompt: shortenPrompt,
           context: this.buildAIContext(context),
           options: { maxTokens: 200, temperature: 0.6 },
         });
-        
+
         return aiResponse.content;
       } catch (error) {
         console.warn('Response shortening failed:', error);
@@ -856,9 +896,12 @@ export class ResponseGenerator {
     return content;
   }
 
-  private async generateContextualFollowUps(context: ResponseContext, response: string): Promise<string[]> {
+  private async generateContextualFollowUps(
+    context: ResponseContext,
+    response: string
+  ): Promise<string[]> {
     const followUpPrompt = `Based on this response: "${response}", suggest 2-3 relevant follow-up questions that would continue the conversation naturally.`;
-    
+
     try {
       const aiResponse = await this.googleAI.generateResponse({
         prompt: followUpPrompt,
@@ -930,7 +973,7 @@ export class ResponseGenerator {
       {
         id: 'daily_checkin',
         category: 'check_in',
-        template: 'How are you feeling today, {name}? What\'s on your mind?',
+        template: "How are you feeling today, {name}? What's on your mind?",
         variables: ['name'],
         conditions: {
           timeOfDay: ['morning', 'afternoon'],
@@ -941,24 +984,28 @@ export class ResponseGenerator {
       {
         id: 'goal_celebration',
         category: 'celebration',
-        template: 'That\'s amazing, {name}! You\'ve made great progress on {goal}. How does it feel?',
+        template: "That's amazing, {name}! You've made great progress on {goal}. How does it feel?",
         variables: ['name', 'goal'],
         conditions: {
           mood: ['positive', 'accomplished'],
         },
         personalizationHooks: ['achievement', 'progress'],
-        followUpSuggestions: ['What\'s next?', 'How can we build on this?'],
+        followUpSuggestions: ["What's next?", 'How can we build on this?'],
       },
       {
         id: 'supportive_response',
         category: 'support',
-        template: 'I hear you, {name}. That sounds {emotion}. What would be most helpful right now?',
+        template:
+          'I hear you, {name}. That sounds {emotion}. What would be most helpful right now?',
         variables: ['name', 'emotion'],
         conditions: {
           mood: ['negative', 'stressed', 'overwhelmed'],
         },
         personalizationHooks: ['coping_strategies', 'support_preferences'],
-        followUpSuggestions: ['Would you like to talk about it?', 'What usually helps you feel better?'],
+        followUpSuggestions: [
+          'Would you like to talk about it?',
+          'What usually helps you feel better?',
+        ],
       },
     ];
 
@@ -970,4 +1017,3 @@ export class ResponseGenerator {
 
 // Global response generator instance
 export const responseGenerator = new ResponseGenerator();
-

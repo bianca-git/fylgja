@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+
 import { FylgjaError, ErrorType } from '../utils/error-handler';
 
 // Base validation schemas
@@ -20,7 +21,7 @@ const RequestTypeSchema = z.enum([
   'goal_setting',
   'reflection_prompt',
   'summary_generation',
-  'proactive_engagement'
+  'proactive_engagement',
 ]);
 
 // Core request validation schema
@@ -30,35 +31,47 @@ const CoreRequestSchema = z.object({
   input: z.string().min(1, 'Input is required'),
   platform: PlatformSchema,
   sessionId: z.string().optional(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.any()).optional(),
 });
 
 // Authentication validation schemas
-const AuthRequestSchema = z.object({
-  email: z.string().email().optional(),
-  phoneNumber: z.string().optional(),
-  platform: PlatformSchema,
-  token: z.string().min(1, 'Token is required'),
-  deviceInfo: z.object({
-    userAgent: z.string().optional(),
-    ipAddress: z.string().optional(),
-    deviceId: z.string().optional()
-  }).optional()
-}).refine(data => data.email || data.phoneNumber, {
-  message: 'Either email or phone number is required'
-});
+const AuthRequestSchema = z
+  .object({
+    email: z.string().email().optional(),
+    phoneNumber: z.string().optional(),
+    platform: PlatformSchema,
+    token: z.string().min(1, 'Token is required'),
+    deviceInfo: z
+      .object({
+        userAgent: z.string().optional(),
+        ipAddress: z.string().optional(),
+        deviceId: z.string().optional(),
+      })
+      .optional(),
+  })
+  .refine(data => data.email || data.phoneNumber, {
+    message: 'Either email or phone number is required',
+  });
 
 // User profile validation schemas
 const UserPreferencesSchema = z.object({
   communicationStyle: z.enum(['formal', 'casual', 'friendly', 'professional']).default('friendly'),
   questionDepth: z.enum(['surface', 'medium', 'deep', 'profound']).default('medium'),
-  personalityType: z.enum([
-    'analytical', 'creative', 'practical', 'empathetic',
-    'ambitious', 'reflective', 'social', 'independent'
-  ]).default('analytical'),
+  personalityType: z
+    .enum([
+      'analytical',
+      'creative',
+      'practical',
+      'empathetic',
+      'ambitious',
+      'reflective',
+      'social',
+      'independent',
+    ])
+    .default('analytical'),
   responseLength: z.enum(['brief', 'moderate', 'detailed']).default('moderate'),
   enableAdaptiveLearning: z.boolean().default(true),
-  privacyLevel: z.enum(['minimal', 'standard', 'enhanced']).default('standard')
+  privacyLevel: z.enum(['minimal', 'standard', 'enhanced']).default('standard'),
 });
 
 const UserProfileSchema = z.object({
@@ -68,11 +81,15 @@ const UserProfileSchema = z.object({
   preferences: UserPreferencesSchema,
   createdAt: TimestampSchema,
   lastActiveAt: TimestampSchema,
-  platformAccounts: z.record(z.object({
-    accountId: z.string(),
-    verified: z.boolean(),
-    linkedAt: TimestampSchema
-  })).optional()
+  platformAccounts: z
+    .record(
+      z.object({
+        accountId: z.string(),
+        verified: z.boolean(),
+        linkedAt: TimestampSchema,
+      })
+    )
+    .optional(),
 });
 
 /**
@@ -100,10 +117,10 @@ export class APIValidator {
       throw new FylgjaError({
         type: ErrorType.VALIDATION,
         message: 'Invalid core request format',
-        context: { 
+        context: {
           timestamp: new Date().toISOString(),
-          metadata: { validationErrors: error instanceof z.ZodError ? error.errors : error }
-        }
+          metadata: { validationErrors: error instanceof z.ZodError ? error.errors : error },
+        },
       });
     }
   }
@@ -118,10 +135,10 @@ export class APIValidator {
       throw new FylgjaError({
         type: ErrorType.VALIDATION,
         message: 'Invalid authentication request format',
-        context: { 
+        context: {
           timestamp: new Date().toISOString(),
-          metadata: { validationErrors: error instanceof z.ZodError ? error.errors : error }
-        }
+          metadata: { validationErrors: error instanceof z.ZodError ? error.errors : error },
+        },
       });
     }
   }
@@ -136,10 +153,10 @@ export class APIValidator {
       throw new FylgjaError({
         type: ErrorType.VALIDATION,
         message: 'Invalid user profile format',
-        context: { 
+        context: {
           timestamp: new Date().toISOString(),
-          metadata: { validationErrors: error instanceof z.ZodError ? error.errors : error }
-        }
+          metadata: { validationErrors: error instanceof z.ZodError ? error.errors : error },
+        },
       });
     }
   }
@@ -152,10 +169,10 @@ export class APIValidator {
       throw new FylgjaError({
         type: ErrorType.VALIDATION,
         message: 'Input must be a string',
-        context: { 
+        context: {
           timestamp: new Date().toISOString(),
-          metadata: { inputType: typeof input }
-        }
+          metadata: { inputType: typeof input },
+        },
       });
     }
 
@@ -171,10 +188,10 @@ export class APIValidator {
       throw new FylgjaError({
         type: ErrorType.VALIDATION,
         message: 'Input exceeds maximum length',
-        context: { 
+        context: {
           timestamp: new Date().toISOString(),
-          metadata: { length: sanitized.length, limit: 10000 }
-        }
+          metadata: { length: sanitized.length, limit: 10000 },
+        },
       });
     }
 
@@ -199,19 +216,13 @@ export class APIValidator {
     return {
       cacheSize: this.validationCache.size,
       cacheHitRate: 0.85, // Mock value - would be calculated in real implementation
-      validationCount: 1000 // Mock value - would be tracked in real implementation
+      validationCount: 1000, // Mock value - would be tracked in real implementation
     };
   }
 }
 
 // Export validation schemas for external use
-export {
-  CoreRequestSchema,
-  AuthRequestSchema,
-  UserProfileSchema,
-  UserPreferencesSchema
-};
+export { CoreRequestSchema, AuthRequestSchema, UserProfileSchema, UserPreferencesSchema };
 
 // Export singleton instance
 export const apiValidator = APIValidator.getInstance();
-

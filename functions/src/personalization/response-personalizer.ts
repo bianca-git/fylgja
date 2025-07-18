@@ -3,12 +3,12 @@
  * Advanced personalization and adaptive response strategies
  */
 
-import { ResponseContext, UserProfile, GeneratedResponse } from '../core/response-generator';
-import { AdaptiveLearningEngine } from '../core/adaptive-learning';
-import { EnhancedDatabaseService } from '../services/enhanced-database-service';
-import { performanceMonitor } from '../utils/monitoring';
-import { FylgjaError, createSystemError } from '../utils/error-handler';
 import { cacheService } from '../cache/redis-cache-service';
+import { AdaptiveLearningEngine } from '../core/adaptive-learning';
+import { ResponseContext, UserProfile, GeneratedResponse } from '../core/response-generator';
+import { EnhancedDatabaseService } from '../services/enhanced-database-service';
+import { FylgjaError, createSystemError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
 
 export interface PersonalizationProfile {
   userId: string;
@@ -107,11 +107,11 @@ export interface AdaptiveAdaptation {
 export class ResponsePersonalizer {
   private database: EnhancedDatabaseService;
   private adaptiveLearning: AdaptiveLearningEngine;
-  
+
   private personalizationStrategies: Map<string, PersonalizationStrategy> = new Map();
   private adaptiveStrategies: Map<string, AdaptiveResponseStrategy> = new Map();
   private userProfiles: Map<string, PersonalizationProfile> = new Map();
-  
+
   private readonly PERSONALIZATION_CACHE_TTL = 1800000; // 30 minutes
   private readonly LEARNING_THRESHOLD = 0.7;
   private readonly ADAPTATION_COOLDOWN = 300000; // 5 minutes
@@ -119,7 +119,7 @@ export class ResponsePersonalizer {
   constructor() {
     this.database = new EnhancedDatabaseService();
     this.adaptiveLearning = new AdaptiveLearningEngine();
-    
+
     this.initializePersonalizationStrategies();
     this.initializeAdaptiveStrategies();
   }
@@ -136,7 +136,7 @@ export class ResponsePersonalizer {
     try {
       // Get or create personalization profile
       const profile = await this.getPersonalizationProfile(context.userId);
-      
+
       // Apply personalization strategies
       const personalizedResponse = await this.applyPersonalizationStrategies(
         baseResponse,
@@ -156,7 +156,6 @@ export class ResponsePersonalizer {
 
       performanceMonitor.endTimer(timerId);
       return adaptedResponse;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Response personalization failed: ${error.message}`);
@@ -177,11 +176,15 @@ export class ResponsePersonalizer {
 
       // Analyze response length preferences
       const lengthPattern = this.analyzeLengthPreference(interactions);
-      if (lengthPattern) patterns.push(lengthPattern);
+      if (lengthPattern) {
+        patterns.push(lengthPattern);
+      }
 
       // Analyze engagement patterns
       const engagementPattern = this.analyzeEngagementPatterns(interactions);
-      if (engagementPattern) patterns.push(engagementPattern);
+      if (engagementPattern) {
+        patterns.push(engagementPattern);
+      }
 
       // Analyze topic preferences
       const topicPatterns = this.analyzeTopicPreferences(interactions);
@@ -193,11 +196,12 @@ export class ResponsePersonalizer {
 
       // Analyze communication style preferences
       const stylePattern = this.analyzeCommunicationStyle(interactions);
-      if (stylePattern) patterns.push(stylePattern);
+      if (stylePattern) {
+        patterns.push(stylePattern);
+      }
 
       performanceMonitor.endTimer(timerId);
       return patterns;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Pattern analysis failed: ${error.message}`);
@@ -216,14 +220,11 @@ export class ResponsePersonalizer {
     try {
       // Analyze recent performance trends
       const performanceTrend = this.analyzePerformanceTrend(recentPerformance);
-      
+
       if (performanceTrend.trend === 'declining') {
         // Generate strategy to improve engagement
-        const strategy = await this.generateEngagementImprovementStrategy(
-          userId,
-          performanceTrend
-        );
-        
+        const strategy = await this.generateEngagementImprovementStrategy(userId, performanceTrend);
+
         performanceMonitor.endTimer(timerId);
         return strategy;
       }
@@ -231,14 +232,13 @@ export class ResponsePersonalizer {
       if (performanceTrend.trend === 'stagnant') {
         // Generate strategy to add variety
         const strategy = await this.generateVarietyStrategy(userId, performanceTrend);
-        
+
         performanceMonitor.endTimer(timerId);
         return strategy;
       }
 
       performanceMonitor.endTimer(timerId);
       return null; // No adaptation needed
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Adaptive strategy generation failed: ${error.message}`);
@@ -301,7 +301,7 @@ export class ResponsePersonalizer {
 
     try {
       const profile = await this.getPersonalizationProfile(userId);
-      
+
       // Update response history
       if (feedback.userReaction === 'positive') {
         profile.responseHistory.successfulResponses.push(feedback);
@@ -310,9 +310,9 @@ export class ResponsePersonalizer {
       }
 
       // Limit history size
-      profile.responseHistory.successfulResponses = 
+      profile.responseHistory.successfulResponses =
         profile.responseHistory.successfulResponses.slice(-50);
-      profile.responseHistory.unsuccessfulResponses = 
+      profile.responseHistory.unsuccessfulResponses =
         profile.responseHistory.unsuccessfulResponses.slice(-20);
 
       // Update average engagement
@@ -320,19 +320,19 @@ export class ResponsePersonalizer {
         ...profile.responseHistory.successfulResponses,
         ...profile.responseHistory.unsuccessfulResponses,
       ];
-      
-      profile.responseHistory.averageEngagement = 
+
+      profile.responseHistory.averageEngagement =
         allFeedback.reduce((sum, f) => sum + f.engagementScore, 0) / allFeedback.length;
 
       // Learn patterns from feedback
       const newPatterns = await this.extractPatternsFromFeedback(feedback, profile);
-      
+
       // Update existing patterns or add new ones
       newPatterns.forEach(newPattern => {
         const existingPattern = profile.adaptiveLearning.patterns.find(
           p => p.pattern === newPattern.pattern
         );
-        
+
         if (existingPattern) {
           existingPattern.frequency += 1;
           existingPattern.confidence = Math.min(1.0, existingPattern.confidence + 0.1);
@@ -346,7 +346,6 @@ export class ResponsePersonalizer {
       await this.savePersonalizationProfile(userId, profile);
 
       performanceMonitor.endTimer(timerId);
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Feedback learning failed: ${error.message}`);
@@ -363,10 +362,10 @@ export class ResponsePersonalizer {
     adaptationHistory: any[];
   }> {
     const profile = await this.getPersonalizationProfile(userId);
-    
+
     // Get top patterns by confidence and frequency
     const topPatterns = profile.adaptiveLearning.patterns
-      .sort((a, b) => (b.confidence * b.frequency) - (a.confidence * a.frequency))
+      .sort((a, b) => b.confidence * b.frequency - a.confidence * a.frequency)
       .slice(0, 5);
 
     // Generate recommendations
@@ -390,7 +389,7 @@ export class ResponsePersonalizer {
     // Check cache first
     const cacheKey = `personalization_profile_${userId}`;
     const cachedProfile = await cacheService.get(cacheKey);
-    
+
     if (cachedProfile) {
       return cachedProfile;
     }
@@ -398,7 +397,7 @@ export class ResponsePersonalizer {
     // Try to load from database
     try {
       const profile = await this.database.getDocument('personalization_profiles', userId);
-      
+
       if (profile) {
         await cacheService.set(cacheKey, profile, { ttl: this.PERSONALIZATION_CACHE_TTL });
         return profile;
@@ -449,14 +448,13 @@ export class ResponsePersonalizer {
     try {
       // Update timestamp
       profile.adaptiveLearning.lastUpdated = new Date().toISOString();
-      
+
       // Save to database
       await this.database.setDocument('personalization_profiles', userId, profile);
-      
+
       // Update cache
       const cacheKey = `personalization_profile_${userId}`;
       await cacheService.set(cacheKey, profile, { ttl: this.PERSONALIZATION_CACHE_TTL });
-      
     } catch (error) {
       throw createSystemError(`Failed to save personalization profile: ${error.message}`);
     }
@@ -521,27 +519,33 @@ export class ResponsePersonalizer {
     context: ResponseContext
   ): Promise<void> {
     const profile = await this.getPersonalizationProfile(userId);
-    
+
     // Update communication patterns based on response
     this.updateCommunicationPatterns(profile, response, context);
-    
+
     // Update contextual preferences
     this.updateContextualPreferences(profile, response, context);
-    
+
     // Save updated profile
     await this.savePersonalizationProfile(userId, profile);
   }
 
   private analyzeLengthPreference(interactions: any[]): PersonalizationPattern | null {
-    if (interactions.length < 5) return null;
+    if (interactions.length < 5) {
+      return null;
+    }
 
     const lengths = interactions.map(i => i.responseLength || 0);
     const avgLength = lengths.reduce((sum, len) => sum + len, 0) / lengths.length;
 
     let preference: string;
-    if (avgLength < 100) preference = 'brief';
-    else if (avgLength < 300) preference = 'moderate';
-    else preference = 'detailed';
+    if (avgLength < 100) {
+      preference = 'brief';
+    } else if (avgLength < 300) {
+      preference = 'moderate';
+    } else {
+      preference = 'detailed';
+    }
 
     return {
       pattern: `prefers_${preference}_responses`,
@@ -554,10 +558,13 @@ export class ResponsePersonalizer {
   }
 
   private analyzeEngagementPatterns(interactions: any[]): PersonalizationPattern | null {
-    if (interactions.length < 3) return null;
+    if (interactions.length < 3) {
+      return null;
+    }
 
     const engagementScores = interactions.map(i => i.engagementScore || 0.5);
-    const avgEngagement = engagementScores.reduce((sum, score) => sum + score, 0) / engagementScores.length;
+    const avgEngagement =
+      engagementScores.reduce((sum, score) => sum + score, 0) / engagementScores.length;
 
     if (avgEngagement > 0.7) {
       return {
@@ -610,11 +617,16 @@ export class ResponsePersonalizer {
       if (interaction.timestamp) {
         const hour = new Date(interaction.timestamp).getHours();
         let timeSlot: string;
-        
-        if (hour < 12) timeSlot = 'morning';
-        else if (hour < 17) timeSlot = 'afternoon';
-        else if (hour < 21) timeSlot = 'evening';
-        else timeSlot = 'night';
+
+        if (hour < 12) {
+          timeSlot = 'morning';
+        } else if (hour < 17) {
+          timeSlot = 'afternoon';
+        } else if (hour < 21) {
+          timeSlot = 'evening';
+        } else {
+          timeSlot = 'night';
+        }
 
         timeSlots[timeSlot] = (timeSlots[timeSlot] || 0) + 1;
       }
@@ -624,8 +636,9 @@ export class ResponsePersonalizer {
     const totalInteractions = interactions.length;
     Object.entries(timeSlots).forEach(([timeSlot, count]) => {
       const percentage = count / totalInteractions;
-      
-      if (percentage > 0.4) { // More than 40% of interactions
+
+      if (percentage > 0.4) {
+        // More than 40% of interactions
         patterns.push({
           pattern: `active_during_${timeSlot}`,
           frequency: count,
@@ -641,13 +654,18 @@ export class ResponsePersonalizer {
   }
 
   private analyzeCommunicationStyle(interactions: any[]): PersonalizationPattern | null {
-    if (interactions.length < 5) return null;
+    if (interactions.length < 5) {
+      return null;
+    }
 
     // Analyze user message characteristics
     const userMessages = interactions.filter(i => i.role === 'user');
-    if (userMessages.length === 0) return null;
+    if (userMessages.length === 0) {
+      return null;
+    }
 
-    const avgMessageLength = userMessages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0) / userMessages.length;
+    const avgMessageLength =
+      userMessages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0) / userMessages.length;
     const formalWords = ['please', 'thank you', 'appreciate', 'kindly'];
     const casualWords = ['hey', 'yeah', 'cool', 'awesome', 'lol'];
 
@@ -657,10 +675,14 @@ export class ResponsePersonalizer {
     userMessages.forEach(msg => {
       const content = (msg.content || '').toLowerCase();
       formalWords.forEach(word => {
-        if (content.includes(word)) formalCount++;
+        if (content.includes(word)) {
+          formalCount++;
+        }
       });
       casualWords.forEach(word => {
-        if (content.includes(word)) casualCount++;
+        if (content.includes(word)) {
+          casualCount++;
+        }
       });
     });
 
@@ -696,23 +718,29 @@ export class ResponsePersonalizer {
       };
     }
 
-    const sortedFeedback = feedback.sort((a, b) => 
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    const sortedFeedback = feedback.sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
     const firstHalf = sortedFeedback.slice(0, Math.floor(sortedFeedback.length / 2));
     const secondHalf = sortedFeedback.slice(Math.floor(sortedFeedback.length / 2));
 
-    const firstHalfAvg = firstHalf.reduce((sum, f) => sum + f.engagementScore, 0) / firstHalf.length;
-    const secondHalfAvg = secondHalf.reduce((sum, f) => sum + f.engagementScore, 0) / secondHalf.length;
+    const firstHalfAvg =
+      firstHalf.reduce((sum, f) => sum + f.engagementScore, 0) / firstHalf.length;
+    const secondHalfAvg =
+      secondHalf.reduce((sum, f) => sum + f.engagementScore, 0) / secondHalf.length;
     const overallAvg = feedback.reduce((sum, f) => sum + f.engagementScore, 0) / feedback.length;
 
     const difference = secondHalfAvg - firstHalfAvg;
 
     let trend: 'improving' | 'declining' | 'stagnant';
-    if (difference > 0.1) trend = 'improving';
-    else if (difference < -0.1) trend = 'declining';
-    else trend = 'stagnant';
+    if (difference > 0.1) {
+      trend = 'improving';
+    } else if (difference < -0.1) {
+      trend = 'declining';
+    } else {
+      trend = 'stagnant';
+    }
 
     return {
       trend,
@@ -797,7 +825,9 @@ export class ResponsePersonalizer {
     };
 
     const adjustment = timeAdjustments[context.timeOfDay];
-    if (!adjustment) return response;
+    if (!adjustment) {
+      return response;
+    }
 
     // Adjust tone based on time of day
     const adjustedContent = response.content.replace(
@@ -820,7 +850,9 @@ export class ResponsePersonalizer {
     context: ResponseContext,
     sensitivity: 'low' | 'medium' | 'high'
   ): Promise<GeneratedResponse> {
-    if (!context.currentMood) return response;
+    if (!context.currentMood) {
+      return response;
+    }
 
     const moodAdjustments: Record<string, { tone: string; approach: string }> = {
       happy: { tone: 'celebratory', approach: 'build on positive energy' },
@@ -831,7 +863,9 @@ export class ResponsePersonalizer {
     };
 
     const adjustment = moodAdjustments[context.currentMood];
-    if (!adjustment) return response;
+    if (!adjustment) {
+      return response;
+    }
 
     // Apply mood-based adjustments based on sensitivity level
     const intensityMultiplier = sensitivity === 'high' ? 1.0 : sensitivity === 'medium' ? 0.7 : 0.4;
@@ -841,7 +875,7 @@ export class ResponsePersonalizer {
       metadata: {
         ...response.metadata,
         tone: adjustment.tone,
-        personalizationScore: response.metadata.personalizationScore + (0.2 * intensityMultiplier),
+        personalizationScore: response.metadata.personalizationScore + 0.2 * intensityMultiplier,
       },
     };
   }
@@ -852,11 +886,11 @@ export class ResponsePersonalizer {
   ): Promise<GeneratedResponse> {
     // Enhance response to focus on user's preferred topics
     const focusedContent = response.content;
-    
+
     // Add topic-specific follow-ups
-    const topicFollowUps = topicFocus.map(topic => 
-      `How has your ${topic} been going lately?`
-    ).slice(0, 2);
+    const topicFollowUps = topicFocus
+      .map(topic => `How has your ${topic} been going lately?`)
+      .slice(0, 2);
 
     return {
       ...response,
@@ -880,7 +914,9 @@ export class ResponsePersonalizer {
     };
 
     const adjustment = platformAdjustments[platform];
-    if (!adjustment) return response;
+    if (!adjustment) {
+      return response;
+    }
 
     // Adjust response length if needed
     let adjustedContent = response.content;
@@ -966,12 +1002,14 @@ export class ResponsePersonalizer {
 
   private async getAdaptationHistory(userId: string): Promise<any[]> {
     try {
-      const history = await this.database.queryDocuments('adaptation_history', [
-        { field: 'userId', operator: '==', value: userId },
-      ], {
-        orderBy: [{ field: 'timestamp', direction: 'desc' }],
-        limit: 20,
-      });
+      const history = await this.database.queryDocuments(
+        'adaptation_history',
+        [{ field: 'userId', operator: '==', value: userId }],
+        {
+          orderBy: [{ field: 'timestamp', direction: 'desc' }],
+          limit: 20,
+        }
+      );
 
       return history.documents;
     } catch (error) {
@@ -1013,8 +1051,10 @@ export class ResponsePersonalizer {
     });
 
     // Limit topic focus to top 10
-    profile.contextualPreferences.topicFocus = 
-      profile.contextualPreferences.topicFocus.slice(0, 10);
+    profile.contextualPreferences.topicFocus = profile.contextualPreferences.topicFocus.slice(
+      0,
+      10
+    );
   }
 
   private async shouldApplyStrategy(
@@ -1024,7 +1064,7 @@ export class ResponsePersonalizer {
   ): Promise<boolean> {
     // Check if all conditions are met
     for (const condition of strategy.conditions) {
-      if (!await this.evaluateCondition(condition, context, profile)) {
+      if (!(await this.evaluateCondition(condition, context, profile))) {
         return false;
       }
     }
@@ -1099,7 +1139,7 @@ export class ResponsePersonalizer {
       ...response,
       metadata: {
         ...response.metadata,
-        personalizationScore: response.metadata.personalizationScore + (pattern.confidence * 0.1),
+        personalizationScore: response.metadata.personalizationScore + pattern.confidence * 0.1,
       },
     };
   }
@@ -1114,12 +1154,7 @@ export class ResponsePersonalizer {
     let adaptedResponse = { ...response };
 
     for (const adaptation of strategy.adaptations) {
-      adaptedResponse = await this.applyAdaptation(
-        adaptedResponse,
-        adaptation,
-        context,
-        profile
-      );
+      adaptedResponse = await this.applyAdaptation(adaptedResponse, adaptation, context, profile);
     }
 
     return adaptedResponse;
@@ -1277,4 +1312,3 @@ export class ResponsePersonalizer {
 
 // Global response personalizer instance
 export const responsePersonalizer = new ResponsePersonalizer();
-

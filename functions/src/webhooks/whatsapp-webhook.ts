@@ -3,20 +3,21 @@
  * Handles incoming WhatsApp messages via Twilio integration
  */
 
-import * as functions from 'firebase-functions';
 import { Request, Response } from 'express';
-import { WhatsAppMessageProcessor } from '../services/whatsapp-message-processor';
-import { TwilioService } from '../services/twilio-service';
-import { APIValidator } from '../validation/api-validator';
+import * as functions from 'firebase-functions';
+
 import { APIPerformanceMonitor } from '../monitoring/api-performance-monitor';
+import { TwilioService } from '../services/twilio-service';
+import { WhatsAppMessageProcessor } from '../services/whatsapp-message-processor';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
 import { RateLimiter } from '../utils/rate-limiter';
+import { APIValidator } from '../validation/api-validator';
 
 // WhatsApp webhook configuration
 const webhookConfig = {
   timeoutSeconds: 60,
   memory: '512MB' as const,
-  region: 'us-central1'
+  region: 'us-central1',
 };
 
 /**
@@ -27,7 +28,7 @@ export const whatsappWebhook = functions
   .region(webhookConfig.region)
   .runWith({
     timeoutSeconds: webhookConfig.timeoutSeconds,
-    memory: webhookConfig.memory
+    memory: webhookConfig.memory,
   })
   .https.onRequest(async (req: Request, res: Response) => {
     const performanceMonitor = APIPerformanceMonitor.getInstance();
@@ -40,7 +41,7 @@ export const whatsappWebhook = functions
         method: req.method,
         headers: req.headers,
         body: req.body,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       // Validate HTTP method
@@ -48,7 +49,7 @@ export const whatsappWebhook = functions
         return res.status(405).json({
           error: 'Method not allowed',
           message: 'WhatsApp webhook only accepts POST requests',
-          requestId
+          requestId,
         });
       }
 
@@ -64,13 +65,13 @@ export const whatsappWebhook = functions
         console.warn('Invalid Twilio signature detected', {
           requestId,
           signature: req.headers['x-twilio-signature'],
-          url: req.originalUrl
+          url: req.originalUrl,
         });
 
         return res.status(401).json({
           error: 'Unauthorized',
           message: 'Invalid webhook signature',
-          requestId
+          requestId,
         });
       }
 
@@ -84,14 +85,14 @@ export const whatsappWebhook = functions
           requestId,
           clientId,
           remainingPoints: rateLimitResult.remainingPoints,
-          resetTime: rateLimitResult.resetTime
+          resetTime: rateLimitResult.resetTime,
         });
 
         return res.status(429).json({
           error: 'Rate limit exceeded',
           message: 'Too many requests. Please try again later.',
           retryAfter: rateLimitResult.resetTime,
-          requestId
+          requestId,
         });
       }
 
@@ -103,14 +104,14 @@ export const whatsappWebhook = functions
         console.error('Invalid WhatsApp webhook payload', {
           requestId,
           errors: validationResult.errors,
-          payload: req.body
+          payload: req.body,
         });
 
         return res.status(400).json({
           error: 'Invalid payload',
           message: 'Webhook payload validation failed',
           details: validationResult.errors,
-          requestId
+          requestId,
         });
       }
 
@@ -128,7 +129,7 @@ export const whatsappWebhook = functions
         numMedia: parseInt(req.body.NumMedia || '0'),
         profileName: req.body.ProfileName || null,
         waId: req.body.WaId || null,
-        requestId
+        requestId,
       };
 
       console.log('Processing WhatsApp message', {
@@ -136,7 +137,7 @@ export const whatsappWebhook = functions
         messageId: messageData.messageId,
         from: messageData.from,
         hasMedia: messageData.numMedia > 0,
-        bodyLength: messageData.body.length
+        bodyLength: messageData.body.length,
       });
 
       // Process message asynchronously
@@ -156,8 +157,8 @@ export const whatsappWebhook = functions
           messageId: messageData.messageId,
           hasMedia: messageData.numMedia > 0,
           processingTime: processingResult.processingTime,
-          responseGenerated: processingResult.responseGenerated
-        }
+          responseGenerated: processingResult.responseGenerated,
+        },
       });
 
       // Return success response to Twilio
@@ -167,7 +168,7 @@ export const whatsappWebhook = functions
         processed: processingResult.success,
         responseGenerated: processingResult.responseGenerated,
         processingTime: processingResult.processingTime,
-        requestId
+        requestId,
       });
 
       console.log('WhatsApp webhook processed successfully', {
@@ -175,15 +176,14 @@ export const whatsappWebhook = functions
         messageId: messageData.messageId,
         success: processingResult.success,
         responseGenerated: processingResult.responseGenerated,
-        processingTime: processingResult.processingTime
+        processingTime: processingResult.processingTime,
       });
-
     } catch (error) {
       console.error('WhatsApp webhook processing failed', {
         requestId,
         error: error.message,
         stack: error.stack,
-        body: req.body
+        body: req.body,
       });
 
       // Record error metrics
@@ -197,8 +197,8 @@ export const whatsappWebhook = functions
         cacheHit: false,
         metadata: {
           error: error.message,
-          requestId
-        }
+          requestId,
+        },
       });
 
       // Return error response
@@ -206,7 +206,7 @@ export const whatsappWebhook = functions
         success: false,
         error: 'Internal server error',
         message: 'Failed to process WhatsApp message',
-        requestId
+        requestId,
       });
     }
   });
@@ -219,7 +219,7 @@ export const whatsappStatusWebhook = functions
   .region(webhookConfig.region)
   .runWith({
     timeoutSeconds: 30,
-    memory: '256MB'
+    memory: '256MB',
   })
   .https.onRequest(async (req: Request, res: Response) => {
     const requestId = `status-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -229,14 +229,14 @@ export const whatsappStatusWebhook = functions
         requestId,
         method: req.method,
         body: req.body,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       // Validate HTTP method
       if (req.method !== 'POST') {
         return res.status(405).json({
           error: 'Method not allowed',
-          requestId
+          requestId,
         });
       }
 
@@ -251,12 +251,12 @@ export const whatsappStatusWebhook = functions
       if (!isValidSignature) {
         console.warn('Invalid Twilio signature for status webhook', {
           requestId,
-          signature: req.headers['x-twilio-signature']
+          signature: req.headers['x-twilio-signature'],
         });
 
         return res.status(401).json({
           error: 'Unauthorized',
-          requestId
+          requestId,
         });
       }
 
@@ -269,14 +269,14 @@ export const whatsappStatusWebhook = functions
         timestamp: new Date(),
         errorCode: req.body.ErrorCode || null,
         errorMessage: req.body.ErrorMessage || null,
-        requestId
+        requestId,
       };
 
       console.log('Processing WhatsApp status update', {
         requestId,
         messageId: statusData.messageId,
         status: statusData.status,
-        hasError: !!statusData.errorCode
+        hasError: !!statusData.errorCode,
       });
 
       // Process status update
@@ -288,27 +288,26 @@ export const whatsappStatusWebhook = functions
         success: true,
         messageId: statusData.messageId,
         status: statusData.status,
-        requestId
+        requestId,
       });
 
       console.log('WhatsApp status webhook processed successfully', {
         requestId,
         messageId: statusData.messageId,
-        status: statusData.status
+        status: statusData.status,
       });
-
     } catch (error) {
       console.error('WhatsApp status webhook processing failed', {
         requestId,
         error: error.message,
         stack: error.stack,
-        body: req.body
+        body: req.body,
       });
 
       res.status(500).json({
         success: false,
         error: 'Internal server error',
-        requestId
+        requestId,
       });
     }
   });
@@ -321,7 +320,7 @@ export const whatsappWebhookHealth = functions
   .region(webhookConfig.region)
   .runWith({
     timeoutSeconds: 30,
-    memory: '256MB'
+    memory: '256MB',
   })
   .https.onRequest(async (req: Request, res: Response) => {
     try {
@@ -330,7 +329,7 @@ export const whatsappWebhookHealth = functions
 
       // Check Twilio service health
       const twilioHealth = await twilioService.checkHealth();
-      
+
       // Check message processor health
       const processorHealth = await messageProcessor.checkHealth();
 
@@ -343,17 +342,19 @@ export const whatsappWebhookHealth = functions
         timestamp: new Date().toISOString(),
         services: {
           twilio: twilioHealth,
-          messageProcessor: processorHealth
+          messageProcessor: processorHealth,
         },
         metrics: {
           recentRequests: recentMetrics.length,
-          averageResponseTime: recentMetrics.length > 0 
-            ? recentMetrics.reduce((sum, m) => sum + m.responseTime, 0) / recentMetrics.length 
-            : 0,
-          successRate: recentMetrics.length > 0 
-            ? recentMetrics.filter(m => m.statusCode < 400).length / recentMetrics.length 
-            : 1
-        }
+          averageResponseTime:
+            recentMetrics.length > 0
+              ? recentMetrics.reduce((sum, m) => sum + m.responseTime, 0) / recentMetrics.length
+              : 0,
+          successRate:
+            recentMetrics.length > 0
+              ? recentMetrics.filter(m => m.statusCode < 400).length / recentMetrics.length
+              : 1,
+        },
       };
 
       // Determine overall health status
@@ -371,18 +372,16 @@ export const whatsappWebhookHealth = functions
 
       const statusCode = healthStatus.status === 'healthy' ? 200 : 503;
       res.status(statusCode).json(healthStatus);
-
     } catch (error) {
       console.error('WhatsApp webhook health check failed', {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
 
       res.status(500).json({
         status: 'error',
         timestamp: new Date().toISOString(),
-        error: error.message
+        error: error.message,
       });
     }
   });
-

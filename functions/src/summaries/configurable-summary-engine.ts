@@ -3,11 +3,11 @@
  * Generates personalized summaries based on user-defined intervals and triggers
  */
 
+import { RedisCacheService } from '../cache/redis-cache-service';
+import { ResponsePersonalizer } from '../personalization/response-personalizer';
 import { EnhancedDatabaseService } from '../services/enhanced-database-service';
 import { GoogleAIService } from '../services/google-ai-service';
-import { ResponsePersonalizer } from '../personalization/response-personalizer';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
-import { RedisCacheService } from '../cache/redis-cache-service';
 
 export interface SummaryConfiguration {
   userId: string;
@@ -148,7 +148,7 @@ export class ConfigurableSummaryEngine {
         userId: config.userId,
         summaryType: config.summaryType,
         timeInterval: config.timeInterval,
-        enabled: config.deliverySettings.enabled
+        enabled: config.deliverySettings.enabled,
       });
 
       // Validate configuration
@@ -168,19 +168,18 @@ export class ConfigurableSummaryEngine {
 
       console.log('Summary configuration saved successfully', {
         userId: config.userId,
-        nextScheduled: config.nextScheduledSummary
+        nextScheduled: config.nextScheduledSummary,
       });
-
     } catch (error) {
       console.error('Failed to configure summary settings', {
         userId: config.userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.VALIDATION_ERROR,
         message: 'Failed to configure summary settings',
-        context: { userId: config.userId, error: error.message }
+        context: { userId: config.userId, error: error.message },
       });
     }
   }
@@ -199,7 +198,7 @@ export class ConfigurableSummaryEngine {
       console.log('Generating summary', {
         userId,
         triggerType,
-        triggerDetails
+        triggerDetails,
       });
 
       // Get user's summary configuration
@@ -208,7 +207,7 @@ export class ConfigurableSummaryEngine {
         throw new FylgjaError({
           type: ErrorType.VALIDATION_ERROR,
           message: 'Summary generation is disabled for this user',
-          context: { userId }
+          context: { userId },
         });
       }
 
@@ -233,8 +232,8 @@ export class ConfigurableSummaryEngine {
           triggerType,
           triggerDetails,
           processingTime: Date.now() - startTime,
-          contentLength: JSON.stringify(summaryContent).length
-        }
+          contentLength: JSON.stringify(summaryContent).length,
+        },
       };
 
       // Store summary in database
@@ -253,22 +252,21 @@ export class ConfigurableSummaryEngine {
         userId,
         summaryId: generatedSummary.id,
         processingTime: generatedSummary.metadata.processingTime,
-        contentLength: generatedSummary.metadata.contentLength
+        contentLength: generatedSummary.metadata.contentLength,
       });
 
       return generatedSummary;
-
     } catch (error) {
       console.error('Failed to generate summary', {
         userId,
         triggerType,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.PROCESSING_ERROR,
         message: 'Failed to generate summary',
-        context: { userId, triggerType, error: error.message }
+        context: { userId, triggerType, error: error.message },
       });
     }
   }
@@ -284,7 +282,7 @@ export class ConfigurableSummaryEngine {
   }> {
     try {
       const config = await this.getSummaryConfiguration(userId);
-      
+
       if (!config.deliverySettings.enabled) {
         return { isDue: false, reason: 'Summary generation disabled' };
       }
@@ -296,7 +294,7 @@ export class ConfigurableSummaryEngine {
             isDue: true,
             reason: 'Scheduled time reached',
             triggerType: 'scheduled',
-            details: { scheduledTime: config.nextScheduledSummary }
+            details: { scheduledTime: config.nextScheduledSummary },
           };
         }
       }
@@ -309,17 +307,16 @@ export class ConfigurableSummaryEngine {
             isDue: true,
             reason: milestoneCheck.reason,
             triggerType: 'milestone',
-            details: milestoneCheck.details
+            details: milestoneCheck.details,
           };
         }
       }
 
       return { isDue: false, reason: 'No triggers met' };
-
     } catch (error) {
       console.error('Failed to check summary due status', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       return { isDue: false, reason: 'Error checking status' };
@@ -334,14 +331,14 @@ export class ConfigurableSummaryEngine {
       // Check cache first
       const cacheKey = `summary_config:${userId}`;
       const cachedConfig = await this.cacheService.get(cacheKey);
-      
+
       if (cachedConfig) {
         return cachedConfig;
       }
 
       // Get from database
       const config = await this.databaseService.getSummaryConfiguration(userId);
-      
+
       if (!config) {
         // Return default configuration
         const defaultConfig: SummaryConfiguration = {
@@ -349,7 +346,7 @@ export class ConfigurableSummaryEngine {
           summaryType: 'time_based',
           timeInterval: {
             type: 'weeks',
-            value: 1
+            value: 1,
           },
           contentPreferences: {
             includeGoals: true,
@@ -359,15 +356,15 @@ export class ConfigurableSummaryEngine {
             includeGrowthInsights: true,
             includeMotivationalContent: true,
             tone: 'encouraging',
-            length: 'detailed'
+            length: 'detailed',
           },
           deliverySettings: {
             platforms: ['whatsapp'], // Default platform
             timezone: 'UTC',
-            enabled: true
+            enabled: true,
           },
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
 
         // Save default configuration
@@ -378,17 +375,16 @@ export class ConfigurableSummaryEngine {
       // Cache configuration
       await this.cacheService.set(cacheKey, config, 3600);
       return config;
-
     } catch (error) {
       console.error('Failed to get summary configuration', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to get summary configuration',
-        context: { userId, error: error.message }
+        context: { userId, error: error.message },
       });
     }
   }
@@ -450,7 +446,7 @@ export class ConfigurableSummaryEngine {
         nextDate.setDate(now.getDate() + config.timeInterval.value);
         break;
       case 'weeks':
-        nextDate.setDate(now.getDate() + (config.timeInterval.value * 7));
+        nextDate.setDate(now.getDate() + config.timeInterval.value * 7);
         break;
       case 'months':
         nextDate.setMonth(now.getMonth() + config.timeInterval.value);
@@ -461,7 +457,7 @@ export class ConfigurableSummaryEngine {
         } else if (config.timeInterval.customUnit === 'days') {
           nextDate.setDate(now.getDate() + config.timeInterval.value);
         } else if (config.timeInterval.customUnit === 'weeks') {
-          nextDate.setDate(now.getDate() + (config.timeInterval.value * 7));
+          nextDate.setDate(now.getDate() + config.timeInterval.value * 7);
         } else if (config.timeInterval.customUnit === 'months') {
           nextDate.setMonth(now.getMonth() + config.timeInterval.value);
         }
@@ -498,7 +494,7 @@ export class ConfigurableSummaryEngine {
       } else {
         // First summary - use last 30 days
         startDate.setDate(endDate.getDate() - 30);
-        description = `Your first summary (last 30 days)`;
+        description = 'Your first summary (last 30 days)';
       }
     } else {
       // For scheduled or manual triggers, use configured interval
@@ -509,7 +505,7 @@ export class ConfigurableSummaryEngine {
             description = `Last ${config.timeInterval.value} day${config.timeInterval.value > 1 ? 's' : ''}`;
             break;
           case 'weeks':
-            startDate.setDate(endDate.getDate() - (config.timeInterval.value * 7));
+            startDate.setDate(endDate.getDate() - config.timeInterval.value * 7);
             description = `Last ${config.timeInterval.value} week${config.timeInterval.value > 1 ? 's' : ''}`;
             break;
           case 'months':
@@ -524,7 +520,7 @@ export class ConfigurableSummaryEngine {
               startDate.setDate(endDate.getDate() - config.timeInterval.value);
               description = `Last ${config.timeInterval.value} day${config.timeInterval.value > 1 ? 's' : ''}`;
             } else if (config.timeInterval.customUnit === 'weeks') {
-              startDate.setDate(endDate.getDate() - (config.timeInterval.value * 7));
+              startDate.setDate(endDate.getDate() - config.timeInterval.value * 7);
               description = `Last ${config.timeInterval.value} week${config.timeInterval.value > 1 ? 's' : ''}`;
             } else if (config.timeInterval.customUnit === 'months') {
               startDate.setMonth(endDate.getMonth() - config.timeInterval.value);
@@ -555,7 +551,7 @@ export class ConfigurableSummaryEngine {
         userId,
         period: period.description,
         startDate: period.startDate,
-        endDate: period.endDate
+        endDate: period.endDate,
       });
 
       // Collect interactions data
@@ -620,49 +616,48 @@ export class ConfigurableSummaryEngine {
           totalCount: interactions.length,
           platforms: this.groupInteractionsByPlatform(interactions),
           averageResponseTime: this.calculateAverageResponseTime(interactions),
-          engagementScore: this.calculateEngagementScore(interactions)
+          engagementScore: this.calculateEngagementScore(interactions),
         },
         goals: {
           completed: goals.filter(g => g.status === 'completed'),
           inProgress: goals.filter(g => g.status === 'in_progress'),
           newGoals: goals.filter(g => new Date(g.createdAt) >= period.startDate),
-          completionRate: this.calculateGoalCompletionRate(goals)
+          completionRate: this.calculateGoalCompletionRate(goals),
         },
         achievements,
         reflections: {
           keyInsights: reflections.map(r => r.insight),
           emotionalTrends: this.analyzeEmotionalTrends(reflections),
-          learningMoments: reflections.filter(r => r.type === 'learning')
+          learningMoments: reflections.filter(r => r.type === 'learning'),
         },
         challenges: {
           identified: challenges.filter(c => c.status === 'identified'),
           overcome: challenges.filter(c => c.status === 'resolved'),
-          ongoing: challenges.filter(c => c.status === 'ongoing')
+          ongoing: challenges.filter(c => c.status === 'ongoing'),
         },
         growthMetrics,
-        personalizedInsights
+        personalizedInsights,
       };
 
       console.log('Summary data collected successfully', {
         userId,
         interactionCount: summaryData.interactions.totalCount,
         goalsCompleted: summaryData.goals.completed.length,
-        achievementsCount: summaryData.achievements.milestones?.length || 0
+        achievementsCount: summaryData.achievements.milestones?.length || 0,
       });
 
       return summaryData;
-
     } catch (error) {
       console.error('Failed to collect summary data', {
         userId,
         period: period.description,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to collect summary data',
-        context: { userId, period: period.description, error: error.message }
+        context: { userId, period: period.description, error: error.message },
       });
     }
   }
@@ -678,7 +673,7 @@ export class ConfigurableSummaryEngine {
       console.log('Generating AI-powered summary content', {
         userId: data.userId,
         tone: config.contentPreferences.tone,
-        length: config.contentPreferences.length
+        length: config.contentPreferences.length,
       });
 
       // Prepare context for AI generation
@@ -690,8 +685,8 @@ export class ConfigurableSummaryEngine {
         context: {
           userId: data.userId,
           summaryType: 'personalized_summary',
-          preferences: config.contentPreferences
-        }
+          preferences: config.contentPreferences,
+        },
       });
 
       // Parse and structure the AI response
@@ -700,21 +695,20 @@ export class ConfigurableSummaryEngine {
       console.log('Summary content generated successfully', {
         userId: data.userId,
         sectionsCount: summaryContent.sections.length,
-        highlightsCount: summaryContent.keyHighlights.length
+        highlightsCount: summaryContent.keyHighlights.length,
       });
 
       return summaryContent;
-
     } catch (error) {
       console.error('Failed to generate summary content', {
         userId: data.userId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.AI_SERVICE_ERROR,
         message: 'Failed to generate summary content',
-        context: { userId: data.userId, error: error.message }
+        context: { userId: data.userId, error: error.message },
       });
     }
   }
@@ -731,62 +725,74 @@ export class ConfigurableSummaryEngine {
         return { triggered: false };
       }
 
-      const lastSummary = config.lastSummaryGenerated || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const lastSummary =
+        config.lastSummaryGenerated || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
       // Check goal completions
       if (config.milestoneSettings.goalCompletions > 0) {
-        const recentGoalCompletions = await this.databaseService.getGoalCompletionsSince(userId, lastSummary);
+        const recentGoalCompletions = await this.databaseService.getGoalCompletionsSince(
+          userId,
+          lastSummary
+        );
         if (recentGoalCompletions >= config.milestoneSettings.goalCompletions) {
           return {
             triggered: true,
             reason: `Completed ${recentGoalCompletions} goals`,
-            details: { goalCompletions: recentGoalCompletions }
+            details: { goalCompletions: recentGoalCompletions },
           };
         }
       }
 
       // Check interaction threshold
       if (config.milestoneSettings.interactionThreshold > 0) {
-        const recentInteractions = await this.databaseService.getInteractionCountSince(userId, lastSummary);
+        const recentInteractions = await this.databaseService.getInteractionCountSince(
+          userId,
+          lastSummary
+        );
         if (recentInteractions >= config.milestoneSettings.interactionThreshold) {
           return {
             triggered: true,
             reason: `Reached ${recentInteractions} interactions`,
-            details: { interactionCount: recentInteractions }
+            details: { interactionCount: recentInteractions },
           };
         }
       }
 
       // Check significant events
       if (config.milestoneSettings.significantEvents) {
-        const significantEvents = await this.databaseService.getSignificantEventsSince(userId, lastSummary);
+        const significantEvents = await this.databaseService.getSignificantEventsSince(
+          userId,
+          lastSummary
+        );
         if (significantEvents.length > 0) {
           return {
             triggered: true,
             reason: 'Significant events detected',
-            details: { events: significantEvents }
+            details: { events: significantEvents },
           };
         }
       }
 
       // Check achievement milestones
       if (config.milestoneSettings.achievementMilestones) {
-        const recentAchievements = await this.databaseService.getAchievementsSince(userId, lastSummary);
+        const recentAchievements = await this.databaseService.getAchievementsSince(
+          userId,
+          lastSummary
+        );
         if (recentAchievements.length > 0) {
           return {
             triggered: true,
             reason: 'New achievements unlocked',
-            details: { achievements: recentAchievements }
+            details: { achievements: recentAchievements },
           };
         }
       }
 
       return { triggered: false };
-
     } catch (error) {
       console.error('Failed to check milestone triggers', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       return { triggered: false };
@@ -804,26 +810,32 @@ export class ConfigurableSummaryEngine {
   }
 
   private calculateAverageResponseTime(interactions: any[]): number {
-    if (interactions.length === 0) return 0;
+    if (interactions.length === 0) {
+      return 0;
+    }
     const totalTime = interactions.reduce((sum, i) => sum + (i.responseTime || 0), 0);
     return totalTime / interactions.length;
   }
 
   private calculateEngagementScore(interactions: any[]): number {
     // Calculate engagement score based on interaction frequency, response quality, etc.
-    if (interactions.length === 0) return 0;
-    
+    if (interactions.length === 0) {
+      return 0;
+    }
+
     const factors = {
       frequency: Math.min(interactions.length / 10, 1), // Max score at 10+ interactions
       responsiveness: interactions.filter(i => i.userResponded).length / interactions.length,
-      depth: interactions.filter(i => i.messageLength > 50).length / interactions.length
+      depth: interactions.filter(i => i.messageLength > 50).length / interactions.length,
     };
 
-    return Math.round((factors.frequency + factors.responsiveness + factors.depth) / 3 * 100);
+    return Math.round(((factors.frequency + factors.responsiveness + factors.depth) / 3) * 100);
   }
 
   private calculateGoalCompletionRate(goals: any[]): number {
-    if (goals.length === 0) return 0;
+    if (goals.length === 0) {
+      return 0;
+    }
     const completed = goals.filter(g => g.status === 'completed').length;
     return Math.round((completed / goals.length) * 100);
   }
@@ -835,7 +847,7 @@ export class ConfigurableSummaryEngine {
       .map(r => ({
         date: r.createdAt,
         emotion: r.emotion,
-        intensity: r.emotionIntensity || 5
+        intensity: r.emotionIntensity || 5,
       }));
   }
 
@@ -855,20 +867,25 @@ export class ConfigurableSummaryEngine {
       consistencyScore,
       progressScore,
       engagementTrend: await engagementTrend,
-      areasOfImprovement: this.identifyImprovementAreas(interactions, goals)
+      areasOfImprovement: this.identifyImprovementAreas(interactions, goals),
     };
   }
 
   private calculateConsistencyScore(interactions: any[], period: any): number {
     // Calculate how consistently the user has been engaging
-    const daysDiff = Math.ceil((period.endDate.getTime() - period.startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.ceil(
+      (period.endDate.getTime() - period.startDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
     const activeDays = new Set(interactions.map(i => new Date(i.timestamp).toDateString())).size;
     return Math.round((activeDays / daysDiff) * 100);
   }
 
   private calculateProgressScore(goals: any[], achievements: any[]): number {
     // Calculate overall progress score based on goals and achievements
-    const goalScore = goals.length > 0 ? (goals.filter(g => g.status === 'completed').length / goals.length) * 50 : 0;
+    const goalScore =
+      goals.length > 0
+        ? (goals.filter(g => g.status === 'completed').length / goals.length) * 50
+        : 0;
     const achievementScore = Math.min(achievements.length * 10, 50);
     return Math.round(goalScore + achievementScore);
   }
@@ -877,8 +894,10 @@ export class ConfigurableSummaryEngine {
     // Compare current period engagement with previous period
     try {
       const previousPeriod = {
-        startDate: new Date(period.startDate.getTime() - (period.endDate.getTime() - period.startDate.getTime())),
-        endDate: period.startDate
+        startDate: new Date(
+          period.startDate.getTime() - (period.endDate.getTime() - period.startDate.getTime())
+        ),
+        endDate: period.startDate,
       };
 
       const currentInteractions = await this.databaseService.getUserInteractions(
@@ -967,17 +986,25 @@ export class ConfigurableSummaryEngine {
       recommendations.push('Your reflection practice is excellent - keep it up!');
     }
 
-    const motivationalMessage = this.generateMotivationalMessage(strengths, opportunities, growthMetrics);
+    const motivationalMessage = this.generateMotivationalMessage(
+      strengths,
+      opportunities,
+      growthMetrics
+    );
 
     return {
       strengths,
       opportunities,
       recommendations,
-      motivationalMessage
+      motivationalMessage,
     };
   }
 
-  private generateMotivationalMessage(strengths: string[], opportunities: string[], growthMetrics: any): string {
+  private generateMotivationalMessage(
+    strengths: string[],
+    opportunities: string[],
+    growthMetrics: any
+  ): string {
     if (growthMetrics.progressScore > 70) {
       return "You're making fantastic progress! Your dedication and consistency are truly paying off. Keep up the excellent work!";
     } else if (growthMetrics.progressScore > 40) {
@@ -997,7 +1024,7 @@ export class ConfigurableSummaryEngine {
       challenges: data.challenges,
       growthMetrics: data.growthMetrics,
       insights: data.personalizedInsights,
-      preferences: config.contentPreferences
+      preferences: config.contentPreferences,
     };
   }
 
@@ -1025,23 +1052,27 @@ User data:
 Create a meaningful, personalized summary that celebrates progress, acknowledges challenges, and provides encouragement for continued growth.`;
   }
 
-  private parseSummaryContent(aiResponse: string, data: SummaryData, config: SummaryConfiguration): any {
+  private parseSummaryContent(
+    aiResponse: string,
+    data: SummaryData,
+    config: SummaryConfiguration
+  ): any {
     // Parse AI response into structured summary content
     // This is a simplified version - in practice, you'd have more sophisticated parsing
-    
+
     const sections = [
       {
         name: 'Overview',
         content: `During ${data.period.description}, you had ${data.interactions.totalCount} interactions with an engagement score of ${data.interactions.engagementScore}.`,
-        insights: [`Your consistency score was ${data.growthMetrics.consistencyScore}%`]
-      }
+        insights: [`Your consistency score was ${data.growthMetrics.consistencyScore}%`],
+      },
     ];
 
     if (config.contentPreferences.includeGoals) {
       sections.push({
         name: 'Goals & Progress',
         content: `You completed ${data.goals.completed.length} goals and have ${data.goals.inProgress.length} goals in progress.`,
-        insights: [`Goal completion rate: ${data.goals.completionRate}%`]
+        insights: [`Goal completion rate: ${data.goals.completionRate}%`],
       });
     }
 
@@ -1049,14 +1080,14 @@ Create a meaningful, personalized summary that celebrates progress, acknowledges
       sections.push({
         name: 'Achievements',
         content: `You unlocked ${data.achievements.milestones.length} new milestones!`,
-        insights: data.achievements.milestones.map(m => m.name)
+        insights: data.achievements.milestones.map(m => m.name),
       });
     }
 
     const keyHighlights = [
       `${data.interactions.totalCount} meaningful interactions`,
       `${data.goals.completed.length} goals completed`,
-      `${data.growthMetrics.consistencyScore}% consistency score`
+      `${data.growthMetrics.consistencyScore}% consistency score`,
     ];
 
     const actionItems = data.personalizedInsights.recommendations;
@@ -1066,7 +1097,7 @@ Create a meaningful, personalized summary that celebrates progress, acknowledges
       sections,
       keyHighlights,
       actionItems,
-      motivationalClosing: data.personalizedInsights.motivationalMessage
+      motivationalClosing: data.personalizedInsights.motivationalMessage,
     };
   }
 
@@ -1079,7 +1110,7 @@ Create a meaningful, personalized summary that celebrates progress, acknowledges
   private async updateLastSummaryDate(userId: string, date: Date): Promise<void> {
     await this.databaseService.updateSummaryConfiguration(userId, {
       lastSummaryGenerated: date,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // Update cache
@@ -1090,7 +1121,7 @@ Create a meaningful, personalized summary that celebrates progress, acknowledges
   private async updateNextSummaryDate(userId: string, date: Date): Promise<void> {
     await this.databaseService.updateSummaryConfiguration(userId, {
       nextScheduledSummary: date,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // Update cache
@@ -1098,4 +1129,3 @@ Create a meaningful, personalized summary that celebrates progress, acknowledges
     await this.cacheService.delete(cacheKey);
   }
 }
-

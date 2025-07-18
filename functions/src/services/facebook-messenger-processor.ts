@@ -1,16 +1,17 @@
 /**
  * Facebook Messenger Processor for Fylgja
  * Handles processing of incoming Facebook Messenger messages
- * 
+ *
  * PLACEHOLDER IMPLEMENTATION - Ready for development
  */
 
+import { RedisCacheService } from '../cache/redis-cache-service';
 import { CoreProcessor } from '../core/core-processor';
-import { FacebookGraphService } from './facebook-graph-service';
-import { EnhancedDatabaseService } from './enhanced-database-service';
 import { ResponsePersonalizer } from '../personalization/response-personalizer';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
-import { RedisCacheService } from '../cache/redis-cache-service';
+
+import { EnhancedDatabaseService } from './enhanced-database-service';
+import { FacebookGraphService } from './facebook-graph-service';
 
 export interface FacebookMessengerEvent {
   sender: { id: string };
@@ -81,7 +82,9 @@ export class FacebookMessengerProcessor {
   /**
    * Process Facebook Messenger messaging event
    */
-  public async processMessagingEvent(event: FacebookMessengerEvent): Promise<MessengerProcessingResult> {
+  public async processMessagingEvent(
+    event: FacebookMessengerEvent
+  ): Promise<MessengerProcessingResult> {
     const startTime = Date.now();
 
     try {
@@ -89,9 +92,9 @@ export class FacebookMessengerProcessor {
         senderId: event.sender.id,
         messageId: event.message?.mid,
         hasText: !!event.message?.text,
-        hasAttachments: !!(event.message?.attachments?.length),
+        hasAttachments: !!event.message?.attachments?.length,
         hasPostback: !!event.postback,
-        requestId: event.requestId
+        requestId: event.requestId,
       });
 
       // Handle different event types
@@ -106,7 +109,7 @@ export class FacebookMessengerProcessor {
       } else {
         console.warn('Unknown Facebook Messenger event type', {
           event,
-          requestId: event.requestId
+          requestId: event.requestId,
         });
 
         return {
@@ -114,15 +117,14 @@ export class FacebookMessengerProcessor {
           messageId: 'unknown',
           responseGenerated: false,
           processingTime: Date.now() - startTime,
-          metadata: { eventType: 'unknown' }
+          metadata: { eventType: 'unknown' },
         };
       }
-
     } catch (error) {
       console.error('Failed to process Facebook Messenger event', {
         senderId: event.sender.id,
         error: error.message,
-        requestId: event.requestId
+        requestId: event.requestId,
       });
 
       return {
@@ -130,7 +132,7 @@ export class FacebookMessengerProcessor {
         messageId: event.message?.mid || 'unknown',
         responseGenerated: false,
         processingTime: Date.now() - startTime,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -138,7 +140,10 @@ export class FacebookMessengerProcessor {
   /**
    * Process incoming message
    */
-  private async processMessage(event: FacebookMessengerEvent, startTime: number): Promise<MessengerProcessingResult> {
+  private async processMessage(
+    event: FacebookMessengerEvent,
+    startTime: number
+  ): Promise<MessengerProcessingResult> {
     const messageId = event.message!.mid;
     const senderId = event.sender.id;
 
@@ -158,7 +163,7 @@ export class FacebookMessengerProcessor {
       timestamp: new Date(event.timestamp),
       attachments: event.message!.attachments,
       quickReply: event.message!.quick_reply,
-      requestId: event.requestId
+      requestId: event.requestId,
     };
 
     // Process message through core processor
@@ -167,7 +172,7 @@ export class FacebookMessengerProcessor {
       message: messageContent,
       platform: 'facebook_messenger',
       context: messageContext,
-      userProfile: userProfile
+      userProfile: userProfile,
     });
 
     // Personalize response for Facebook Messenger
@@ -176,7 +181,7 @@ export class FacebookMessengerProcessor {
       userId: userProfile.id,
       platform: 'facebook_messenger',
       context: messageContext,
-      userPreferences: userProfile.preferences
+      userPreferences: userProfile.preferences,
     });
 
     // Send response via Facebook Messenger
@@ -204,15 +209,17 @@ export class FacebookMessengerProcessor {
         messageId,
         content: messageContent,
         timestamp: new Date(event.timestamp),
-        attachments: event.message!.attachments
+        attachments: event.message!.attachments,
       },
-      outgoingMessage: responseGenerated ? {
-        messageId: responseMessageId!,
-        content: personalizedResponse.content!,
-        timestamp: new Date()
-      } : null,
+      outgoingMessage: responseGenerated
+        ? {
+            messageId: responseMessageId!,
+            content: personalizedResponse.content!,
+            timestamp: new Date(),
+          }
+        : null,
       context: messageContext,
-      coreResponse: coreResponse
+      coreResponse: coreResponse,
     });
 
     // Update user engagement metrics
@@ -221,7 +228,7 @@ export class FacebookMessengerProcessor {
       messageReceived: true,
       responseGenerated,
       processingTime: Date.now() - startTime,
-      hasAttachments: !!(event.message!.attachments?.length)
+      hasAttachments: !!event.message!.attachments?.length,
     });
 
     return {
@@ -233,21 +240,24 @@ export class FacebookMessengerProcessor {
       metadata: {
         userId: userProfile.id,
         coreResponseType: coreResponse.type,
-        personalizedResponseType: personalizedResponse.type
-      }
+        personalizedResponseType: personalizedResponse.type,
+      },
     };
   }
 
   /**
    * Process postback event
    */
-  private async processPostback(event: FacebookMessengerEvent, startTime: number): Promise<MessengerProcessingResult> {
+  private async processPostback(
+    event: FacebookMessengerEvent,
+    startTime: number
+  ): Promise<MessengerProcessingResult> {
     // PLACEHOLDER: Implement postback processing
     console.log('Processing Facebook Messenger postback (PLACEHOLDER)', {
       senderId: event.sender.id,
       payload: event.postback!.payload,
       title: event.postback!.title,
-      requestId: event.requestId
+      requestId: event.requestId,
     });
 
     return {
@@ -255,19 +265,22 @@ export class FacebookMessengerProcessor {
       messageId: `postback-${event.timestamp}`,
       responseGenerated: false,
       processingTime: Date.now() - startTime,
-      metadata: { eventType: 'postback', payload: event.postback!.payload }
+      metadata: { eventType: 'postback', payload: event.postback!.payload },
     };
   }
 
   /**
    * Process delivery confirmation
    */
-  private async processDelivery(event: FacebookMessengerEvent, startTime: number): Promise<MessengerProcessingResult> {
+  private async processDelivery(
+    event: FacebookMessengerEvent,
+    startTime: number
+  ): Promise<MessengerProcessingResult> {
     // PLACEHOLDER: Implement delivery processing
     console.log('Processing Facebook Messenger delivery (PLACEHOLDER)', {
       mids: event.delivery!.mids,
       watermark: event.delivery!.watermark,
-      requestId: event.requestId
+      requestId: event.requestId,
     });
 
     return {
@@ -275,18 +288,21 @@ export class FacebookMessengerProcessor {
       messageId: `delivery-${event.timestamp}`,
       responseGenerated: false,
       processingTime: Date.now() - startTime,
-      metadata: { eventType: 'delivery', mids: event.delivery!.mids }
+      metadata: { eventType: 'delivery', mids: event.delivery!.mids },
     };
   }
 
   /**
    * Process read confirmation
    */
-  private async processRead(event: FacebookMessengerEvent, startTime: number): Promise<MessengerProcessingResult> {
+  private async processRead(
+    event: FacebookMessengerEvent,
+    startTime: number
+  ): Promise<MessengerProcessingResult> {
     // PLACEHOLDER: Implement read processing
     console.log('Processing Facebook Messenger read (PLACEHOLDER)', {
       watermark: event.read!.watermark,
-      requestId: event.requestId
+      requestId: event.requestId,
     });
 
     return {
@@ -294,7 +310,7 @@ export class FacebookMessengerProcessor {
       messageId: `read-${event.timestamp}`,
       responseGenerated: false,
       processingTime: Date.now() - startTime,
-      metadata: { eventType: 'read', watermark: event.read!.watermark }
+      metadata: { eventType: 'read', watermark: event.read!.watermark },
     };
   }
 
@@ -331,12 +347,15 @@ export class FacebookMessengerProcessor {
   /**
    * Get or create user profile for Facebook Messenger user
    */
-  private async getOrCreateUserProfile(facebookId: string, event: FacebookMessengerEvent): Promise<any> {
+  private async getOrCreateUserProfile(
+    facebookId: string,
+    event: FacebookMessengerEvent
+  ): Promise<any> {
     try {
       // Check cache first
       const cacheKey = `user_profile:facebook:${facebookId}`;
       const cachedProfile = await this.cacheService.get(cacheKey);
-      
+
       if (cachedProfile) {
         return cachedProfile;
       }
@@ -363,17 +382,17 @@ export class FacebookMessengerProcessor {
             notificationSettings: {
               dailyCheckIns: true,
               reminders: true,
-              summaries: true
-            }
+              summaries: true,
+            },
           },
           createdAt: new Date(),
-          lastActiveAt: new Date()
+          lastActiveAt: new Date(),
         });
 
         console.log('Created new Facebook Messenger user profile', {
           userId: userProfile.id,
           facebookId,
-          firstName: facebookUserInfo.first_name
+          firstName: facebookUserInfo.first_name,
         });
       } else {
         // Update last active time
@@ -384,17 +403,16 @@ export class FacebookMessengerProcessor {
       await this.cacheService.set(cacheKey, userProfile, 3600); // Cache for 1 hour
 
       return userProfile;
-
     } catch (error) {
       console.error('Failed to get or create user profile', {
         facebookId,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to get or create user profile',
-        context: { facebookId, error: error.message }
+        context: { facebookId, error: error.message },
       });
     }
   }
@@ -412,31 +430,30 @@ export class FacebookMessengerProcessor {
       console.log('Sending Facebook Messenger response (PLACEHOLDER)', {
         recipientId,
         contentLength: content.length,
-        requestId
+        requestId,
       });
 
       // This would use Facebook Graph API to send the message
       const result = await this.facebookService.sendMessage({
         recipientId,
         message: content,
-        requestId
+        requestId,
       });
 
       return {
         success: true,
-        messageId: result.messageId
+        messageId: result.messageId,
       };
-
     } catch (error) {
       console.error('Failed to send Facebook Messenger response', {
         recipientId,
         error: error.message,
-        requestId
+        requestId,
       });
 
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -456,25 +473,28 @@ export class FacebookMessengerProcessor {
             messageId: conversationData.incomingMessage.messageId,
             content: conversationData.incomingMessage.content,
             timestamp: conversationData.incomingMessage.timestamp,
-            attachments: conversationData.incomingMessage.attachments
+            attachments: conversationData.incomingMessage.attachments,
           },
-          ...(conversationData.outgoingMessage ? [{
-            type: 'outgoing',
-            messageId: conversationData.outgoingMessage.messageId,
-            content: conversationData.outgoingMessage.content,
-            timestamp: conversationData.outgoingMessage.timestamp
-          }] : [])
+          ...(conversationData.outgoingMessage
+            ? [
+                {
+                  type: 'outgoing',
+                  messageId: conversationData.outgoingMessage.messageId,
+                  content: conversationData.outgoingMessage.content,
+                  timestamp: conversationData.outgoingMessage.timestamp,
+                },
+              ]
+            : []),
         ],
         context: conversationData.context,
         coreResponse: conversationData.coreResponse,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
-
     } catch (error) {
       console.error('Failed to store conversation', {
         userId: conversationData.userId,
         messageId: conversationData.incomingMessage.messageId,
-        error: error.message
+        error: error.message,
       });
 
       // Don't throw error for storage failures to avoid blocking message processing
@@ -492,13 +512,12 @@ export class FacebookMessengerProcessor {
         messageCount: 1,
         responseGenerated: engagementData.responseGenerated,
         averageProcessingTime: engagementData.processingTime,
-        hasAttachmentInteraction: engagementData.hasAttachments
+        hasAttachmentInteraction: engagementData.hasAttachments,
       });
-
     } catch (error) {
       console.error('Failed to update user engagement', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       // Don't throw error for metrics failures
@@ -525,11 +544,10 @@ export class FacebookMessengerProcessor {
           timestamp: new Date().toISOString(),
           placeholder: {
             implemented: false,
-            readyForDevelopment: true
-          }
-        }
+            readyForDevelopment: true,
+          },
+        },
       };
-
     } catch (error) {
       return {
         healthy: false,
@@ -538,11 +556,10 @@ export class FacebookMessengerProcessor {
           timestamp: new Date().toISOString(),
           placeholder: {
             implemented: false,
-            readyForDevelopment: true
-          }
-        }
+            readyForDevelopment: true,
+          },
+        },
       };
     }
   }
 }
-

@@ -3,8 +3,8 @@
  * High-performance caching with Redis-like operations and Firebase integration
  */
 
-import { performanceMonitor } from '../utils/monitoring';
 import { FylgjaError, createSystemError } from '../utils/error-handler';
+import { performanceMonitor } from '../utils/monitoring';
 
 export interface CacheOptions {
   ttl?: number;
@@ -91,7 +91,7 @@ export class RedisCacheService {
 
     try {
       const entry = this.cache.get(fullKey);
-      
+
       if (!entry) {
         this.stats.misses++;
         performanceMonitor.endTimer(timerId);
@@ -129,7 +129,6 @@ export class RedisCacheService {
       }
 
       return value;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Cache get failed: ${error.message}`);
@@ -139,11 +138,7 @@ export class RedisCacheService {
   /**
    * Set value in cache
    */
-  async set(
-    key: string, 
-    value: any, 
-    options: CacheOptions = {}
-  ): Promise<boolean> {
+  async set(key: string, value: any, options: CacheOptions = {}): Promise<boolean> {
     const timerId = performanceMonitor.startTimer('cache_set');
     const fullKey = this.buildKey(key, options.namespace);
 
@@ -186,7 +181,6 @@ export class RedisCacheService {
 
       performanceMonitor.endTimer(timerId);
       return true;
-
     } catch (error) {
       performanceMonitor.endTimer(timerId);
       throw createSystemError(`Cache set failed: ${error.message}`);
@@ -199,7 +193,7 @@ export class RedisCacheService {
   async del(key: string, options: CacheOptions = {}): Promise<boolean> {
     const fullKey = this.buildKey(key, options.namespace);
     const deleted = this.cache.delete(fullKey);
-    
+
     if (deleted) {
       this.stats.deletes++;
     }
@@ -213,9 +207,11 @@ export class RedisCacheService {
   async exists(key: string, options: CacheOptions = {}): Promise<boolean> {
     const fullKey = this.buildKey(key, options.namespace);
     const entry = this.cache.get(fullKey);
-    
-    if (!entry) return false;
-    
+
+    if (!entry) {
+      return false;
+    }
+
     // Check expiration
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(fullKey);
@@ -231,8 +227,10 @@ export class RedisCacheService {
   async expire(key: string, ttl: number, options: CacheOptions = {}): Promise<boolean> {
     const fullKey = this.buildKey(key, options.namespace);
     const entry = this.cache.get(fullKey);
-    
-    if (!entry) return false;
+
+    if (!entry) {
+      return false;
+    }
 
     entry.expiresAt = Date.now() + ttl;
     return true;
@@ -243,7 +241,7 @@ export class RedisCacheService {
    */
   async mget(keys: string[], options: CacheOptions = {}): Promise<(any | null)[]> {
     const results: (any | null)[] = [];
-    
+
     for (const key of keys) {
       results.push(await this.get(key, options));
     }
@@ -255,7 +253,7 @@ export class RedisCacheService {
    * Set multiple key-value pairs
    */
   async mset(
-    keyValues: Array<{ key: string; value: any }>, 
+    keyValues: Array<{ key: string; value: any }>,
     options: CacheOptions = {}
   ): Promise<boolean> {
     try {
@@ -295,9 +293,9 @@ export class RedisCacheService {
     const namespace = options.namespace || '';
     const fullPattern = this.buildKey(pattern, namespace);
     const regex = this.patternToRegex(fullPattern);
-    
+
     const matchingKeys: string[] = [];
-    
+
     for (const key of this.cache.keys()) {
       if (regex.test(key)) {
         // Remove prefix and namespace for return
@@ -415,7 +413,9 @@ export class RedisCacheService {
    */
   private buildKey(key: string, namespace?: string): string {
     const parts = [this.config.keyPrefix];
-    if (namespace) parts.push(namespace);
+    if (namespace) {
+      parts.push(namespace);
+    }
     parts.push(key);
     return parts.join(':');
   }
@@ -496,17 +496,17 @@ export class RedisCacheService {
 
   private async evictMemory(requiredSpace: number): Promise<void> {
     const entries = Array.from(this.cache.entries());
-    
+
     // Sort by eviction policy
     switch (this.config.evictionPolicy) {
       case 'lru':
-        entries.sort(([,a], [,b]) => a.lastAccessed - b.lastAccessed);
+        entries.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
         break;
       case 'lfu':
-        entries.sort(([,a], [,b]) => a.accessCount - b.accessCount);
+        entries.sort(([, a], [, b]) => a.accessCount - b.accessCount);
         break;
       case 'ttl':
-        entries.sort(([,a], [,b]) => a.expiresAt - b.expiresAt);
+        entries.sort(([, a], [, b]) => a.expiresAt - b.expiresAt);
         break;
       case 'random':
         entries.sort(() => Math.random() - 0.5);
@@ -517,8 +517,10 @@ export class RedisCacheService {
     let evicted = 0;
 
     for (const [key, entry] of entries) {
-      if (freedSpace >= requiredSpace) break;
-      
+      if (freedSpace >= requiredSpace) {
+        break;
+      }
+
       this.cache.delete(key);
       freedSpace += entry.size;
       evicted++;
@@ -530,9 +532,9 @@ export class RedisCacheService {
   private async evictLeastAccessed(percentage: number): Promise<number> {
     const entries = Array.from(this.cache.entries());
     const toEvict = Math.floor(entries.length * percentage);
-    
-    entries.sort(([,a], [,b]) => a.accessCount - b.accessCount);
-    
+
+    entries.sort(([, a], [, b]) => a.accessCount - b.accessCount);
+
     for (let i = 0; i < toEvict; i++) {
       this.cache.delete(entries[i][0]);
     }
@@ -552,8 +554,10 @@ export class RedisCacheService {
     this.stats.memoryUsage = totalSize;
     this.stats.keyCount = this.cache.size;
     this.stats.averageKeySize = this.cache.size > 0 ? totalKeySize / this.cache.size : 0;
-    this.stats.hitRate = this.stats.hits + this.stats.misses > 0 ? 
-      this.stats.hits / (this.stats.hits + this.stats.misses) : 0;
+    this.stats.hitRate =
+      this.stats.hits + this.stats.misses > 0
+        ? this.stats.hits / (this.stats.hits + this.stats.misses)
+        : 0;
   }
 
   private resetStats(): void {
@@ -574,7 +578,7 @@ export class RedisCacheService {
 
     for (const [key, entry] of this.cache.entries()) {
       const pattern = this.extractPattern(key);
-      
+
       if (!patterns.has(pattern)) {
         patterns.set(pattern, { keys: [], totalSize: 0 });
       }
@@ -600,9 +604,11 @@ export class RedisCacheService {
       .replace(/:[a-zA-Z0-9]+$/g, ':*'); // End identifiers
   }
 
-  private getTopAccessedKeys(limit: number): Array<{ key: string; accessCount: number; size: number }> {
+  private getTopAccessedKeys(
+    limit: number
+  ): Array<{ key: string; accessCount: number; size: number }> {
     const entries = Array.from(this.cache.entries());
-    
+
     return entries
       .map(([key, entry]) => ({
         key,
@@ -629,4 +635,3 @@ export class RedisCacheService {
 
 // Global cache service instance
 export const cacheService = new RedisCacheService();
-

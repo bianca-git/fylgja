@@ -4,15 +4,17 @@
  */
 
 import * as functions from 'firebase-functions';
-import { scheduledTasksManager } from './scheduled-tasks';
+
 import { APIPerformanceMonitor } from '../monitoring/api-performance-monitor';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
+
+import { scheduledTasksManager } from './scheduled-tasks';
 
 // Cloud Scheduler configuration
 const schedulerConfig = {
   timeoutSeconds: 540, // 9 minutes (max for Cloud Functions)
   memory: '1GB' as const,
-  region: 'us-central1'
+  region: 'us-central1',
 };
 
 /**
@@ -23,7 +25,7 @@ export const dailyCheckInScheduler = functions
   .region(schedulerConfig.region)
   .runWith({
     timeoutSeconds: schedulerConfig.timeoutSeconds,
-    memory: schedulerConfig.memory
+    memory: schedulerConfig.memory,
   })
   .pubsub.topic('fylgja-daily-checkins')
   .onPublish(async (message, context) => {
@@ -34,12 +36,13 @@ export const dailyCheckInScheduler = functions
       console.log('Daily check-in scheduler triggered', {
         eventId: context.eventId,
         timestamp: context.timestamp,
-        messageData: message.data
+        messageData: message.data,
       });
 
       // Parse message data
-      const messageData = message.data ? 
-        JSON.parse(Buffer.from(message.data, 'base64').toString()) : {};
+      const messageData = message.data
+        ? JSON.parse(Buffer.from(message.data, 'base64').toString())
+        : {};
 
       // Create task context
       const taskContext = {
@@ -50,8 +53,8 @@ export const dailyCheckInScheduler = functions
         timezone: messageData.timezone || 'UTC',
         metadata: {
           eventId: context.eventId,
-          ...messageData
-        }
+          ...messageData,
+        },
       };
 
       // Execute daily check-ins
@@ -68,24 +71,23 @@ export const dailyCheckInScheduler = functions
         cacheHit: false,
         metadata: {
           processedUsers: result.processedUsers,
-          errors: result.errors.length
-        }
+          errors: result.errors.length,
+        },
       });
 
       console.log('Daily check-in scheduler completed', {
         success: result.success,
         processedUsers: result.processedUsers,
         duration: result.duration,
-        errors: result.errors.length
+        errors: result.errors.length,
       });
 
       return result;
-
     } catch (error) {
       console.error('Daily check-in scheduler failed', {
         error: error.message,
         stack: error.stack,
-        eventId: context.eventId
+        eventId: context.eventId,
       });
 
       // Record error metrics
@@ -97,7 +99,7 @@ export const dailyCheckInScheduler = functions
         requestSize: 0,
         responseSize: 0,
         cacheHit: false,
-        metadata: { error: error.message }
+        metadata: { error: error.message },
       });
 
       throw new FylgjaError({
@@ -105,8 +107,8 @@ export const dailyCheckInScheduler = functions
         message: 'Daily check-in scheduler failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, eventId: context.eventId }
-        }
+          metadata: { error: error.message, eventId: context.eventId },
+        },
       });
     }
   });
@@ -119,7 +121,7 @@ export const reminderScheduler = functions
   .region(schedulerConfig.region)
   .runWith({
     timeoutSeconds: schedulerConfig.timeoutSeconds,
-    memory: schedulerConfig.memory
+    memory: schedulerConfig.memory,
   })
   .pubsub.topic('fylgja-reminders')
   .onPublish(async (message, context) => {
@@ -129,11 +131,12 @@ export const reminderScheduler = functions
     try {
       console.log('Reminder scheduler triggered', {
         eventId: context.eventId,
-        timestamp: context.timestamp
+        timestamp: context.timestamp,
       });
 
-      const messageData = message.data ? 
-        JSON.parse(Buffer.from(message.data, 'base64').toString()) : {};
+      const messageData = message.data
+        ? JSON.parse(Buffer.from(message.data, 'base64').toString())
+        : {};
 
       const taskContext = {
         taskId: `reminders-${context.eventId}`,
@@ -144,8 +147,8 @@ export const reminderScheduler = functions
         metadata: {
           eventId: context.eventId,
           reminderType: messageData.reminderType || 'general',
-          ...messageData
-        }
+          ...messageData,
+        },
       };
 
       const result = await scheduledTasksManager.executeReminders(taskContext);
@@ -160,22 +163,21 @@ export const reminderScheduler = functions
         cacheHit: false,
         metadata: {
           processedUsers: result.processedUsers,
-          errors: result.errors.length
-        }
+          errors: result.errors.length,
+        },
       });
 
       console.log('Reminder scheduler completed', {
         success: result.success,
         processedUsers: result.processedUsers,
-        duration: result.duration
+        duration: result.duration,
       });
 
       return result;
-
     } catch (error) {
       console.error('Reminder scheduler failed', {
         error: error.message,
-        eventId: context.eventId
+        eventId: context.eventId,
       });
 
       performanceMonitor.recordMetric({
@@ -186,7 +188,7 @@ export const reminderScheduler = functions
         requestSize: 0,
         responseSize: 0,
         cacheHit: false,
-        metadata: { error: error.message }
+        metadata: { error: error.message },
       });
 
       throw new FylgjaError({
@@ -194,8 +196,8 @@ export const reminderScheduler = functions
         message: 'Reminder scheduler failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, eventId: context.eventId }
-        }
+          metadata: { error: error.message, eventId: context.eventId },
+        },
       });
     }
   });
@@ -208,7 +210,7 @@ export const weeklySummaryScheduler = functions
   .region(schedulerConfig.region)
   .runWith({
     timeoutSeconds: schedulerConfig.timeoutSeconds,
-    memory: schedulerConfig.memory
+    memory: schedulerConfig.memory,
   })
   .pubsub.topic('fylgja-weekly-summaries')
   .onPublish(async (message, context) => {
@@ -218,11 +220,12 @@ export const weeklySummaryScheduler = functions
     try {
       console.log('Weekly summary scheduler triggered', {
         eventId: context.eventId,
-        timestamp: context.timestamp
+        timestamp: context.timestamp,
       });
 
-      const messageData = message.data ? 
-        JSON.parse(Buffer.from(message.data, 'base64').toString()) : {};
+      const messageData = message.data
+        ? JSON.parse(Buffer.from(message.data, 'base64').toString())
+        : {};
 
       const taskContext = {
         taskId: `weekly-summary-${context.eventId}`,
@@ -233,8 +236,8 @@ export const weeklySummaryScheduler = functions
         metadata: {
           eventId: context.eventId,
           summaryType: 'weekly',
-          ...messageData
-        }
+          ...messageData,
+        },
       };
 
       const result = await scheduledTasksManager.executeSummaryGeneration(taskContext);
@@ -249,22 +252,21 @@ export const weeklySummaryScheduler = functions
         cacheHit: false,
         metadata: {
           processedUsers: result.processedUsers,
-          errors: result.errors.length
-        }
+          errors: result.errors.length,
+        },
       });
 
       console.log('Weekly summary scheduler completed', {
         success: result.success,
         processedUsers: result.processedUsers,
-        duration: result.duration
+        duration: result.duration,
       });
 
       return result;
-
     } catch (error) {
       console.error('Weekly summary scheduler failed', {
         error: error.message,
-        eventId: context.eventId
+        eventId: context.eventId,
       });
 
       performanceMonitor.recordMetric({
@@ -275,7 +277,7 @@ export const weeklySummaryScheduler = functions
         requestSize: 0,
         responseSize: 0,
         cacheHit: false,
-        metadata: { error: error.message }
+        metadata: { error: error.message },
       });
 
       throw new FylgjaError({
@@ -283,8 +285,8 @@ export const weeklySummaryScheduler = functions
         message: 'Weekly summary scheduler failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, eventId: context.eventId }
-        }
+          metadata: { error: error.message, eventId: context.eventId },
+        },
       });
     }
   });
@@ -297,7 +299,7 @@ export const monthlySummaryScheduler = functions
   .region(schedulerConfig.region)
   .runWith({
     timeoutSeconds: schedulerConfig.timeoutSeconds,
-    memory: schedulerConfig.memory
+    memory: schedulerConfig.memory,
   })
   .pubsub.topic('fylgja-monthly-summaries')
   .onPublish(async (message, context) => {
@@ -307,11 +309,12 @@ export const monthlySummaryScheduler = functions
     try {
       console.log('Monthly summary scheduler triggered', {
         eventId: context.eventId,
-        timestamp: context.timestamp
+        timestamp: context.timestamp,
       });
 
-      const messageData = message.data ? 
-        JSON.parse(Buffer.from(message.data, 'base64').toString()) : {};
+      const messageData = message.data
+        ? JSON.parse(Buffer.from(message.data, 'base64').toString())
+        : {};
 
       const taskContext = {
         taskId: `monthly-summary-${context.eventId}`,
@@ -322,8 +325,8 @@ export const monthlySummaryScheduler = functions
         metadata: {
           eventId: context.eventId,
           summaryType: 'monthly',
-          ...messageData
-        }
+          ...messageData,
+        },
       };
 
       const result = await scheduledTasksManager.executeSummaryGeneration(taskContext);
@@ -338,22 +341,21 @@ export const monthlySummaryScheduler = functions
         cacheHit: false,
         metadata: {
           processedUsers: result.processedUsers,
-          errors: result.errors.length
-        }
+          errors: result.errors.length,
+        },
       });
 
       console.log('Monthly summary scheduler completed', {
         success: result.success,
         processedUsers: result.processedUsers,
-        duration: result.duration
+        duration: result.duration,
       });
 
       return result;
-
     } catch (error) {
       console.error('Monthly summary scheduler failed', {
         error: error.message,
-        eventId: context.eventId
+        eventId: context.eventId,
       });
 
       performanceMonitor.recordMetric({
@@ -364,7 +366,7 @@ export const monthlySummaryScheduler = functions
         requestSize: 0,
         responseSize: 0,
         cacheHit: false,
-        metadata: { error: error.message }
+        metadata: { error: error.message },
       });
 
       throw new FylgjaError({
@@ -372,8 +374,8 @@ export const monthlySummaryScheduler = functions
         message: 'Monthly summary scheduler failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, eventId: context.eventId }
-        }
+          metadata: { error: error.message, eventId: context.eventId },
+        },
       });
     }
   });
@@ -386,7 +388,7 @@ export const maintenanceScheduler = functions
   .region(schedulerConfig.region)
   .runWith({
     timeoutSeconds: schedulerConfig.timeoutSeconds,
-    memory: schedulerConfig.memory
+    memory: schedulerConfig.memory,
   })
   .pubsub.topic('fylgja-maintenance')
   .onPublish(async (message, context) => {
@@ -396,11 +398,12 @@ export const maintenanceScheduler = functions
     try {
       console.log('Maintenance scheduler triggered', {
         eventId: context.eventId,
-        timestamp: context.timestamp
+        timestamp: context.timestamp,
       });
 
-      const messageData = message.data ? 
-        JSON.parse(Buffer.from(message.data, 'base64').toString()) : {};
+      const messageData = message.data
+        ? JSON.parse(Buffer.from(message.data, 'base64').toString())
+        : {};
 
       const taskContext = {
         taskId: `maintenance-${context.eventId}`,
@@ -411,8 +414,8 @@ export const maintenanceScheduler = functions
         metadata: {
           eventId: context.eventId,
           maintenanceType: messageData.maintenanceType || 'health_check',
-          ...messageData
-        }
+          ...messageData,
+        },
       };
 
       const result = await scheduledTasksManager.executeMaintenanceTasks(taskContext);
@@ -427,22 +430,21 @@ export const maintenanceScheduler = functions
         cacheHit: false,
         metadata: {
           maintenanceType: messageData.maintenanceType,
-          errors: result.errors.length
-        }
+          errors: result.errors.length,
+        },
       });
 
       console.log('Maintenance scheduler completed', {
         success: result.success,
         maintenanceType: messageData.maintenanceType,
-        duration: result.duration
+        duration: result.duration,
       });
 
       return result;
-
     } catch (error) {
       console.error('Maintenance scheduler failed', {
         error: error.message,
-        eventId: context.eventId
+        eventId: context.eventId,
       });
 
       performanceMonitor.recordMetric({
@@ -453,7 +455,7 @@ export const maintenanceScheduler = functions
         requestSize: 0,
         responseSize: 0,
         cacheHit: false,
-        metadata: { error: error.message }
+        metadata: { error: error.message },
       });
 
       throw new FylgjaError({
@@ -461,8 +463,8 @@ export const maintenanceScheduler = functions
         message: 'Maintenance scheduler failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, eventId: context.eventId }
-        }
+          metadata: { error: error.message, eventId: context.eventId },
+        },
       });
     }
   });
@@ -475,7 +477,7 @@ export const proactiveEngagementScheduler = functions
   .region(schedulerConfig.region)
   .runWith({
     timeoutSeconds: schedulerConfig.timeoutSeconds,
-    memory: schedulerConfig.memory
+    memory: schedulerConfig.memory,
   })
   .pubsub.topic('fylgja-proactive-engagement')
   .onPublish(async (message, context) => {
@@ -485,11 +487,12 @@ export const proactiveEngagementScheduler = functions
     try {
       console.log('Proactive engagement scheduler triggered', {
         eventId: context.eventId,
-        timestamp: context.timestamp
+        timestamp: context.timestamp,
       });
 
-      const messageData = message.data ? 
-        JSON.parse(Buffer.from(message.data, 'base64').toString()) : {};
+      const messageData = message.data
+        ? JSON.parse(Buffer.from(message.data, 'base64').toString())
+        : {};
 
       const taskContext = {
         taskId: `proactive-engagement-${context.eventId}`,
@@ -500,8 +503,8 @@ export const proactiveEngagementScheduler = functions
         metadata: {
           eventId: context.eventId,
           engagementType: messageData.engagementType || 'check_in',
-          ...messageData
-        }
+          ...messageData,
+        },
       };
 
       const result = await scheduledTasksManager.executeProactiveEngagement(taskContext);
@@ -516,22 +519,21 @@ export const proactiveEngagementScheduler = functions
         cacheHit: false,
         metadata: {
           processedUsers: result.processedUsers,
-          errors: result.errors.length
-        }
+          errors: result.errors.length,
+        },
       });
 
       console.log('Proactive engagement scheduler completed', {
         success: result.success,
         processedUsers: result.processedUsers,
-        duration: result.duration
+        duration: result.duration,
       });
 
       return result;
-
     } catch (error) {
       console.error('Proactive engagement scheduler failed', {
         error: error.message,
-        eventId: context.eventId
+        eventId: context.eventId,
       });
 
       performanceMonitor.recordMetric({
@@ -542,7 +544,7 @@ export const proactiveEngagementScheduler = functions
         requestSize: 0,
         responseSize: 0,
         cacheHit: false,
-        metadata: { error: error.message }
+        metadata: { error: error.message },
       });
 
       throw new FylgjaError({
@@ -550,8 +552,8 @@ export const proactiveEngagementScheduler = functions
         message: 'Proactive engagement scheduler failed',
         context: {
           timestamp: new Date().toISOString(),
-          metadata: { error: error.message, eventId: context.eventId }
-        }
+          metadata: { error: error.message, eventId: context.eventId },
+        },
       });
     }
   });
@@ -564,19 +566,19 @@ export const schedulerHealthCheck = functions
   .region(schedulerConfig.region)
   .runWith({
     timeoutSeconds: 60,
-    memory: '256MB'
+    memory: '256MB',
   })
   .https.onRequest(async (req, res) => {
     try {
       const performanceMonitor = APIPerformanceMonitor.getInstance();
-      
+
       // Get scheduler execution statistics
       const stats = scheduledTasksManager.getExecutionStatistics();
       const recentExecutions = scheduledTasksManager.getExecutionHistory(10);
-      
+
       // Get system health
       const systemHealth = await performanceMonitor.getSystemHealth();
-      
+
       const healthReport = {
         status: 'healthy',
         timestamp: new Date().toISOString(),
@@ -585,7 +587,7 @@ export const schedulerHealthCheck = functions
           successRate: stats.successRate,
           averageExecutionTime: stats.averageExecutionTime,
           averageUsersProcessed: stats.averageUsersProcessed,
-          errorRate: stats.errorRate
+          errorRate: stats.errorRate,
         },
         system: systemHealth,
         recentExecutions: recentExecutions.map(exec => ({
@@ -594,8 +596,8 @@ export const schedulerHealthCheck = functions
           duration: exec.duration,
           processedUsers: exec.processedUsers,
           errorCount: exec.errors.length,
-          executionTime: exec.executionTime
-        }))
+          executionTime: exec.executionTime,
+        })),
       };
 
       // Determine overall health status
@@ -608,14 +610,13 @@ export const schedulerHealthCheck = functions
       }
 
       res.status(healthReport.status === 'healthy' ? 200 : 503).json(healthReport);
-
     } catch (error) {
       console.error('Scheduler health check failed', error);
-      
+
       res.status(500).json({
         status: 'error',
         timestamp: new Date().toISOString(),
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -628,7 +629,7 @@ export const manualTaskTrigger = functions
   .region(schedulerConfig.region)
   .runWith({
     timeoutSeconds: schedulerConfig.timeoutSeconds,
-    memory: schedulerConfig.memory
+    memory: schedulerConfig.memory,
   })
   .https.onRequest(async (req, res) => {
     try {
@@ -638,7 +639,7 @@ export const manualTaskTrigger = functions
       }
 
       const { taskType, parameters = {} } = req.body;
-      
+
       if (!taskType) {
         return res.status(400).json({ error: 'Task type is required' });
       }
@@ -647,7 +648,7 @@ export const manualTaskTrigger = functions
         taskType,
         parameters,
         userAgent: req.get('User-Agent'),
-        ip: req.ip
+        ip: req.ip,
       });
 
       // Create task context
@@ -660,8 +661,8 @@ export const manualTaskTrigger = functions
         metadata: {
           manual: true,
           triggeredBy: req.ip,
-          ...parameters
-        }
+          ...parameters,
+        },
       };
 
       let result;
@@ -697,7 +698,7 @@ export const manualTaskTrigger = functions
         taskType,
         success: result.success,
         duration: result.duration,
-        processedUsers: result.processedUsers
+        processedUsers: result.processedUsers,
       });
 
       res.status(result.success ? 200 : 500).json({
@@ -706,20 +707,18 @@ export const manualTaskTrigger = functions
         duration: result.duration,
         processedUsers: result.processedUsers,
         errors: result.errors,
-        metrics: result.metrics
+        metrics: result.metrics,
       });
-
     } catch (error) {
       console.error('Manual task trigger failed', {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
 
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   });
-

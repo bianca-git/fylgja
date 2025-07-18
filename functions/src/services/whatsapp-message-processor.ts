@@ -3,12 +3,13 @@
  * Handles processing of incoming WhatsApp messages and generates responses
  */
 
+import { RedisCacheService } from '../cache/redis-cache-service';
 import { CoreProcessor } from '../core/core-processor';
-import { TwilioService } from './twilio-service';
-import { EnhancedDatabaseService } from './enhanced-database-service';
 import { ResponsePersonalizer } from '../personalization/response-personalizer';
 import { FylgjaError, ErrorType } from '../utils/error-handler';
-import { RedisCacheService } from '../cache/redis-cache-service';
+
+import { EnhancedDatabaseService } from './enhanced-database-service';
+import { TwilioService } from './twilio-service';
 
 export interface WhatsAppMessageData {
   messageId: string;
@@ -73,7 +74,9 @@ export class WhatsAppMessageProcessor {
   /**
    * Process incoming WhatsApp message
    */
-  public async processIncomingMessage(messageData: WhatsAppMessageData): Promise<MessageProcessingResult> {
+  public async processIncomingMessage(
+    messageData: WhatsAppMessageData
+  ): Promise<MessageProcessingResult> {
     const startTime = Date.now();
 
     try {
@@ -81,12 +84,12 @@ export class WhatsAppMessageProcessor {
         messageId: messageData.messageId,
         from: messageData.from,
         bodyLength: messageData.body.length,
-        hasMedia: messageData.numMedia > 0
+        hasMedia: messageData.numMedia > 0,
       });
 
       // Extract user phone number (remove WhatsApp prefix)
       const userPhone = this.extractPhoneNumber(messageData.from);
-      
+
       // Get or create user profile
       const userProfile = await this.getOrCreateUserProfile(userPhone, messageData);
 
@@ -106,7 +109,7 @@ export class WhatsAppMessageProcessor {
         mediaContent,
         profileName: messageData.profileName,
         waId: messageData.waId,
-        requestId: messageData.requestId
+        requestId: messageData.requestId,
       };
 
       // Process message through core processor
@@ -115,7 +118,7 @@ export class WhatsAppMessageProcessor {
         message: messageData.body,
         platform: 'whatsapp',
         context: messageContext,
-        userProfile: userProfile
+        userProfile: userProfile,
       });
 
       // Personalize response for WhatsApp
@@ -124,7 +127,7 @@ export class WhatsAppMessageProcessor {
         userId: userProfile.id,
         platform: 'whatsapp',
         context: messageContext,
-        userPreferences: userProfile.preferences
+        userPreferences: userProfile.preferences,
       });
 
       // Send response via WhatsApp
@@ -152,15 +155,17 @@ export class WhatsAppMessageProcessor {
           messageId: messageData.messageId,
           content: messageData.body,
           timestamp: messageData.timestamp,
-          mediaContent
+          mediaContent,
         },
-        outgoingMessage: responseGenerated ? {
-          messageId: responseMessageId!,
-          content: personalizedResponse.content!,
-          timestamp: new Date()
-        } : null,
+        outgoingMessage: responseGenerated
+          ? {
+              messageId: responseMessageId!,
+              content: personalizedResponse.content!,
+              timestamp: new Date(),
+            }
+          : null,
         context: messageContext,
-        coreResponse: coreResponse
+        coreResponse: coreResponse,
       });
 
       // Update user engagement metrics
@@ -169,7 +174,7 @@ export class WhatsAppMessageProcessor {
         messageReceived: true,
         responseGenerated,
         processingTime: Date.now() - startTime,
-        hasMedia: messageData.numMedia > 0
+        hasMedia: messageData.numMedia > 0,
       });
 
       const result: MessageProcessingResult = {
@@ -181,24 +186,23 @@ export class WhatsAppMessageProcessor {
         metadata: {
           userId: userProfile.id,
           coreResponseType: coreResponse.type,
-          personalizedResponseType: personalizedResponse.type
-        }
+          personalizedResponseType: personalizedResponse.type,
+        },
       };
 
       console.log('WhatsApp message processed successfully', {
         messageId: messageData.messageId,
         userId: userProfile.id,
         responseGenerated,
-        processingTime: result.processingTime
+        processingTime: result.processingTime,
       });
 
       return result;
-
     } catch (error) {
       console.error('Failed to process WhatsApp message', {
         messageId: messageData.messageId,
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
 
       return {
@@ -206,7 +210,7 @@ export class WhatsAppMessageProcessor {
         messageId: messageData.messageId,
         responseGenerated: false,
         processingTime: Date.now() - startTime,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -219,7 +223,7 @@ export class WhatsAppMessageProcessor {
       console.log('Processing WhatsApp status update', {
         messageId: statusData.messageId,
         status: statusData.status,
-        hasError: !!statusData.errorCode
+        hasError: !!statusData.errorCode,
       });
 
       // Update message status in database
@@ -228,7 +232,7 @@ export class WhatsAppMessageProcessor {
         status: statusData.status,
         timestamp: statusData.timestamp,
         errorCode: statusData.errorCode,
-        errorMessage: statusData.errorMessage
+        errorMessage: statusData.errorMessage,
       });
 
       // Handle delivery failures
@@ -241,14 +245,13 @@ export class WhatsAppMessageProcessor {
 
       console.log('WhatsApp status update processed successfully', {
         messageId: statusData.messageId,
-        status: statusData.status
+        status: statusData.status,
       });
-
     } catch (error) {
       console.error('Failed to process WhatsApp status update', {
         messageId: statusData.messageId,
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
 
       throw new FylgjaError({
@@ -257,8 +260,8 @@ export class WhatsAppMessageProcessor {
         context: {
           messageId: statusData.messageId,
           status: statusData.status,
-          error: error.message
-        }
+          error: error.message,
+        },
       });
     }
   }
@@ -279,24 +282,23 @@ export class WhatsAppMessageProcessor {
       const result = await this.twilioService.sendWhatsAppMessage({
         to: whatsappNumber,
         body: content,
-        requestId
+        requestId,
       });
 
       return {
         success: true,
-        messageId: result.messageId
+        messageId: result.messageId,
       };
-
     } catch (error) {
       console.error('Failed to send WhatsApp response', {
         userPhone,
         error: error.message,
-        requestId
+        requestId,
       });
 
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -312,12 +314,15 @@ export class WhatsAppMessageProcessor {
   /**
    * Get or create user profile for WhatsApp user
    */
-  private async getOrCreateUserProfile(userPhone: string, messageData: WhatsAppMessageData): Promise<any> {
+  private async getOrCreateUserProfile(
+    userPhone: string,
+    messageData: WhatsAppMessageData
+  ): Promise<any> {
     try {
       // Check cache first
       const cacheKey = `user_profile:whatsapp:${userPhone}`;
       const cachedProfile = await this.cacheService.get(cacheKey);
-      
+
       if (cachedProfile) {
         return cachedProfile;
       }
@@ -340,17 +345,17 @@ export class WhatsAppMessageProcessor {
             notificationSettings: {
               dailyCheckIns: true,
               reminders: true,
-              summaries: true
-            }
+              summaries: true,
+            },
           },
           createdAt: new Date(),
-          lastActiveAt: new Date()
+          lastActiveAt: new Date(),
         });
 
         console.log('Created new WhatsApp user profile', {
           userId: userProfile.id,
           phone: userPhone,
-          profileName: messageData.profileName
+          profileName: messageData.profileName,
         });
       } else {
         // Update last active time
@@ -361,17 +366,16 @@ export class WhatsAppMessageProcessor {
       await this.cacheService.set(cacheKey, userProfile, 3600); // Cache for 1 hour
 
       return userProfile;
-
     } catch (error) {
       console.error('Failed to get or create user profile', {
         userPhone,
-        error: error.message
+        error: error.message,
       });
 
       throw new FylgjaError({
         type: ErrorType.DATABASE_ERROR,
         message: 'Failed to get or create user profile',
-        context: { userPhone, error: error.message }
+        context: { userPhone, error: error.message },
       });
     }
   }
@@ -393,7 +397,7 @@ export class WhatsAppMessageProcessor {
         type: messageData.mediaContentType,
         url: messageData.mediaUrl,
         size: mediaContent.length,
-        timestamp: messageData.timestamp
+        timestamp: messageData.timestamp,
       };
 
       // Handle different media types
@@ -409,19 +413,18 @@ export class WhatsAppMessageProcessor {
       }
 
       return processedContent;
-
     } catch (error) {
       console.error('Failed to process media content', {
         messageId: messageData.messageId,
         mediaUrl: messageData.mediaUrl,
-        error: error.message
+        error: error.message,
       });
 
       return {
         type: messageData.mediaContentType,
         url: messageData.mediaUrl,
         error: error.message,
-        timestamp: messageData.timestamp
+        timestamp: messageData.timestamp,
       };
     }
   }
@@ -441,25 +444,28 @@ export class WhatsAppMessageProcessor {
             messageId: conversationData.incomingMessage.messageId,
             content: conversationData.incomingMessage.content,
             timestamp: conversationData.incomingMessage.timestamp,
-            mediaContent: conversationData.incomingMessage.mediaContent
+            mediaContent: conversationData.incomingMessage.mediaContent,
           },
-          ...(conversationData.outgoingMessage ? [{
-            type: 'outgoing',
-            messageId: conversationData.outgoingMessage.messageId,
-            content: conversationData.outgoingMessage.content,
-            timestamp: conversationData.outgoingMessage.timestamp
-          }] : [])
+          ...(conversationData.outgoingMessage
+            ? [
+                {
+                  type: 'outgoing',
+                  messageId: conversationData.outgoingMessage.messageId,
+                  content: conversationData.outgoingMessage.content,
+                  timestamp: conversationData.outgoingMessage.timestamp,
+                },
+              ]
+            : []),
         ],
         context: conversationData.context,
         coreResponse: conversationData.coreResponse,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
-
     } catch (error) {
       console.error('Failed to store conversation', {
         userId: conversationData.userId,
         messageId: conversationData.incomingMessage.messageId,
-        error: error.message
+        error: error.message,
       });
 
       // Don't throw error for storage failures to avoid blocking message processing
@@ -477,13 +483,12 @@ export class WhatsAppMessageProcessor {
         messageCount: 1,
         responseGenerated: engagementData.responseGenerated,
         averageProcessingTime: engagementData.processingTime,
-        hasMediaInteraction: engagementData.hasMedia
+        hasMediaInteraction: engagementData.hasMedia,
       });
-
     } catch (error) {
       console.error('Failed to update user engagement', {
         userId,
-        error: error.message
+        error: error.message,
       });
 
       // Don't throw error for metrics failures
@@ -498,7 +503,7 @@ export class WhatsAppMessageProcessor {
       console.warn('WhatsApp message delivery failed', {
         messageId: statusData.messageId,
         errorCode: statusData.errorCode,
-        errorMessage: statusData.errorMessage
+        errorMessage: statusData.errorMessage,
       });
 
       // Store delivery failure for analysis
@@ -508,7 +513,7 @@ export class WhatsAppMessageProcessor {
         errorCode: statusData.errorCode,
         errorMessage: statusData.errorMessage,
         timestamp: statusData.timestamp,
-        recipientPhone: statusData.to
+        recipientPhone: statusData.to,
       });
 
       // Implement retry logic for certain error types
@@ -516,14 +521,13 @@ export class WhatsAppMessageProcessor {
         // Schedule retry (implementation depends on retry strategy)
         console.log('Scheduling delivery retry', {
           messageId: statusData.messageId,
-          errorCode: statusData.errorCode
+          errorCode: statusData.errorCode,
         });
       }
-
     } catch (error) {
       console.error('Failed to handle delivery failure', {
         messageId: statusData.messageId,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -538,15 +542,14 @@ export class WhatsAppMessageProcessor {
         status: statusData.status,
         timestamp: statusData.timestamp,
         hasError: !!statusData.errorCode,
-        errorCode: statusData.errorCode
+        errorCode: statusData.errorCode,
       };
 
       await this.databaseService.updateDeliveryMetrics(statusData.messageId, metrics);
-
     } catch (error) {
       console.error('Failed to update delivery metrics', {
         messageId: statusData.messageId,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -555,7 +558,9 @@ export class WhatsAppMessageProcessor {
    * Check if delivery should be retried based on error code
    */
   private shouldRetryDelivery(errorCode?: string): boolean {
-    if (!errorCode) return false;
+    if (!errorCode) {
+      return false;
+    }
 
     // Retry for temporary errors
     const retryableErrors = [
@@ -589,19 +594,17 @@ export class WhatsAppMessageProcessor {
           twilio: twilioHealth,
           database: databaseHealth,
           cache: cacheHealth,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       };
-
     } catch (error) {
       return {
         healthy: false,
         details: {
           error: error.message,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       };
     }
   }
 }
-
